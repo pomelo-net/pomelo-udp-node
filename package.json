@@ -1,0 +1,26 @@
+{
+  "name": "pomelo-udp",
+  "version": "0.0.0",
+  "description": "The udp socket for games",
+  "main": "lib/pomelo-udp.js",
+  "private": true,
+  "gypfile": true,
+  "type": "module",
+  "scripts": {
+    "configure": "node-gyp configure",
+    "configure:dev": "node-gyp configure --debug",
+    "clean": "node-gyp clean",
+    "build": "node-gyp -j 12 build"
+  },
+  "dependencies": {
+    "bindings": "*"
+  },
+  "engines": {
+    "node": ">= 10.16.0"
+  },
+  "devDependencies": {
+    "@types/bindings": "^1.5.5",
+    "@types/node": "^20.10.4",
+    "typescript": "^5.3.3"
+  }
+}
