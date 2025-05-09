@@ -1,15 +1,15 @@
 #ifndef POMELO_NODE_CONTEXT_SRC_H
 #define POMELO_NODE_CONTEXT_SRC_H
 #include "module.h"
-#include "uv.h"
-#include "utils/list.h"
-
+#include "utils/pool.h"
+#include "utils/array.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
+/// @brief Context options
 typedef struct pomelo_node_context_options_s pomelo_node_context_options_t;
 
 
@@ -20,17 +20,23 @@ struct pomelo_node_context_options_s {
     /// @brief Node evironment
     napi_env env;
 
+    /// @brief Maximum number of sockets in pool
+    size_t pool_socket_max;
+
     /// @brief Maximum number of JS messages in pool
     size_t pool_message_max;
 
     /// @brief Maximum number of sessions in pool
     size_t pool_session_max;
 
-    /// @brief Maximum number of sessions in pool
+    /// @brief Maximum number of channels in pool
     size_t pool_channel_max;
 
     /// @brief Error handler
     napi_value error_handler;
+
+    /// @brief Platform
+    napi_value platform;
 };
 
 
@@ -62,31 +68,24 @@ struct pomelo_node_context_s {
     /// @brief Class channel
     napi_ref class_channel;
 
+    /// @brief Pool of sockets
+    pomelo_pool_t * pool_socket;
+
+    /// @brief Pool of messages
+    pomelo_pool_t * pool_message;
+
     /// @brief Pool of sessions
-    pomelo_list_t * pool_message;
-
-    /// @brief Maximum number of messages in pool
-    size_t pool_message_max;
-
-    /// @brief Pool of sessions
-    pomelo_list_t * pool_session;
-
-    /// @brief Maximum number of sessions in pool
-    size_t pool_session_max;
+    pomelo_pool_t * pool_session;
 
     /// @brief Pool of channels
-    pomelo_list_t * pool_channel;
-
-    /// @brief Maximum number of sessions in pool
-    size_t pool_channel_max;
+    pomelo_pool_t * pool_channel;
 
     /// @brief Error handler
     napi_ref error_handler;
+
+    /// @brief Temporary sessions for sending
+    pomelo_array_t * tmp_send_sessions;
 };
-
-
-/// @brief Initialize node context options
-void pomelo_node_context_options_init(pomelo_node_context_options_t * options);
 
 
 /// @brief Create context
@@ -107,61 +106,53 @@ void pomelo_node_context_finalizer(
 );
 
 
-/// @brief Ref the platform
-void pomelo_node_context_ref_platform(pomelo_node_context_t * context);
-
-
-/// @brief Unref the platform
-void pomelo_node_context_unref_platform(pomelo_node_context_t * context);
-
-
-/// @brief Create node socket
-pomelo_node_socket_t * pomelo_node_context_create_node_socket(
+/// @brief Acquire new node socket
+pomelo_node_socket_t * pomelo_node_context_acquire_socket(
     pomelo_node_context_t * context
 );
 
 
-/// @brief Destroy node socket
-void pomelo_node_context_destroy_node_socket(
+/// @brief Release a node socket
+void pomelo_node_context_release_socket(
     pomelo_node_context_t * context,
     pomelo_node_socket_t * node_socket
 );
 
 
-/// @brief Create node session
-pomelo_node_session_t * pomelo_node_context_create_node_session(
+/// @brief Acquire a node session
+pomelo_node_session_t * pomelo_node_context_acquire_session(
     pomelo_node_context_t * context
 );
 
 
-/// @brief Destroy node session
-void pomelo_node_context_destroy_node_session(
+/// @brief Release a node session
+void pomelo_node_context_release_session(
     pomelo_node_context_t * context,
     pomelo_node_session_t * node_session
 );
 
 
-/// @brief Create new node message
-pomelo_node_message_t * pomelo_node_context_create_node_message(
+/// @brief Acquire a node message
+pomelo_node_message_t * pomelo_node_context_acquire_message(
     pomelo_node_context_t * context
 );
 
 
-/// @brief Destroy node message
-void pomelo_node_context_destroy_node_message(
+/// @brief Release a node message
+void pomelo_node_context_release_message(
     pomelo_node_context_t * context,
     pomelo_node_message_t * node_message
 );
 
 
-/// @brief Create new node channel
-pomelo_node_channel_t * pomelo_node_context_create_node_channel(
+/// @brief Acquire a node channel
+pomelo_node_channel_t * pomelo_node_context_acquire_channel(
     pomelo_node_context_t * context
 );
 
 
 /// @brief Destroy node channel
-void pomelo_node_context_destroy_node_channel(
+void pomelo_node_context_release_channel(
     pomelo_node_context_t * context,
     pomelo_node_channel_t * node_channel
 );
@@ -179,6 +170,10 @@ void pomelo_node_context_handle_error_default(
     pomelo_node_context_t * context,
     napi_value error
 );
+
+
+/// @brief statistic()
+napi_value pomelo_node_context_statistic(napi_env env, napi_callback_info info);
 
 
 #ifdef __cplusplus

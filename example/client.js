@@ -1,6 +1,6 @@
 import http from "node:http";
 import { Message, Socket, Plugin } from "../lib/pomelo.js";
-import { ADDRESS_HOST, ADDRESS_PORT, CHANNEL_MODES } from "./shared.js";
+import { ADDRESS_HOST, ADDRESS_PORT, CHANNEL_MODES, SERVICE_HOST, SERVICE_PORT } from "./shared.js";
 
 
 async function main() {
@@ -22,7 +22,7 @@ async function main() {
             console.log(`Connected ID = ${session.id}`);
 
             console.log("Writing message");
-            const message = Message.acquire();
+            const message = new Message();
             message.writeInt32(1234);
             message.writeUint64(999888);
             const result = session.send(0, message);
@@ -55,7 +55,7 @@ async function main() {
 function requestConnectToken() {
     return new Promise((resolve, reject) => {
         const chunks = [];
-        const address = `http://${ADDRESS_HOST}:${ADDRESS_PORT}`;
+        const address = `http://${SERVICE_HOST}:${SERVICE_PORT}`;
         const req = http.request(address, function(res) {
             res.setEncoding('utf8');
             res.on('data', chunk => chunks.push(chunk));

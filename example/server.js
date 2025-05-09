@@ -1,6 +1,6 @@
 import http from "node:http";
 import { Message, Socket, Token, Plugin } from "../lib/pomelo.js";
-import { CHANNEL_MODES, ADDRESS_HOST, ADDRESS_PORT } from "./shared.js";
+import { CHANNEL_MODES, ADDRESS_HOST, ADDRESS_PORT, SERVICE_PORT, SERVICE_HOST } from "./shared.js";
 
 
 const MAX_CLIENTS = 20;
@@ -39,7 +39,7 @@ async function main() {
             console.log(`Message size: ${size}`);
 
             // Reply with the same data
-            const reply = Message.acquire();
+            const reply = new Message();
             reply.write(message.read(size));
             session.send(0, reply);
         }
@@ -77,7 +77,8 @@ async function main() {
         res.writeHead(200, {
             'Content-Type': 'text/plain',
             'Content-Length': tokenB64.length,
-            'Connection': 'close'
+            'Connection': 'close',
+            'Access-Control-Allow-Origin': '*'
         });
 
         res.end(tokenB64);
@@ -86,8 +87,10 @@ async function main() {
         clientID++;
     });
 
-    server.listen(ADDRESS_PORT, ADDRESS_HOST, () => {
-        console.log(`HTTP server is litening on ${address}`);
+    server.listen(SERVICE_PORT, SERVICE_HOST, () => {
+        console.log(
+            `HTTP server is started: http://${SERVICE_HOST}:${SERVICE_PORT}`
+        );
     });
 }
 

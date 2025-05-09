@@ -11,11 +11,7 @@ extern "C" {
 /*----------------------------------------------------------------------------*/
 
 /// @brief Initialize plugin module
-napi_status pomelo_node_init_plugin_module(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value ns
-);
+napi_status pomelo_node_init_plugin_module(napi_env env, napi_value ns);
 
 
 /*----------------------------------------------------------------------------*/

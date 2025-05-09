@@ -16,11 +16,11 @@
 /*----------------------------------------------------------------------------*/
 
 /// @brief Initialize plugin module
-napi_status pomelo_node_init_plugin_module(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value ns
-) {
+napi_status pomelo_node_init_plugin_module(napi_env env, napi_value ns) {
+    pomelo_node_context_t * context = NULL;
+    napi_calls(napi_get_instance_data(env, (void **) &context));
+    assert(context != NULL);
+
     napi_value plugin = NULL;
     napi_calls(napi_create_object(env, &plugin));
 
@@ -96,7 +96,7 @@ napi_value pomelo_node_plugin_register_plugin_by_name(
 
     pomelo_plugin_t * plugin = pomelo_plugin_register(
         context->allocator,
-        (pomelo_context_t *) context->context,
+        context->context,
         context->platform,
         initializer
     );
@@ -144,7 +144,7 @@ napi_value pomelo_node_plugin_register_plugin_by_path(
 
     pomelo_plugin_t * plugin = pomelo_plugin_register(
         context->allocator,
-        (pomelo_context_t *) context->context,
+        context->context,
         context->platform,
         initializer
     );

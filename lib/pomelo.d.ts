@@ -21,16 +21,6 @@ export enum ConnectResult {
  */
 export class Message {
     /**
-     * Acquire new message from pool
-     */
-    static acquire(): Message;
-
-    /**
-     * Release message to pool
-     */
-    static release(message: Message);
-
-    /**
      * Get the size of message
      */
     size(): number;
@@ -197,9 +187,10 @@ export interface Channel {
     /**
      * Send message by specific channel
      * @param message The message to send
-     * @returns True if success or false if failed
+     * @returns Returns a promise which will resolve to a number value
+     * indicating the number of sent messages.
      */
-    send(message: Message): boolean;
+    send(message: Message): Promise<number>;
 }
 
 
@@ -226,9 +217,10 @@ export interface Session {
      * Send message to the peer connected by this session
      * @param channelIndex The channel to send
      * @param message The message to send
-     * @returns Returns false if session is disconnected
+     * @returns Returns a promise which will resolve to a number value
+     * indicating the number of sent messages.
      */
-    send(channelIndex: number, message: Message): boolean;
+    send(channelIndex: number, message: Message): Promise<number>;
 
     /**
      * Set mode for specific channel of a session
@@ -286,15 +278,15 @@ export interface SocketListener {
 
 
 /**
- * Statistic information of socket
+ * Statistic
  */
-export interface SocketStatistic {
+export interface Statistic {
     /**
      * The allocator statistic
      */
     allocator: {
         /**
-         * The number of in-use bytes
+         * The number of allocated bytes
          */
         allocatedBytes: BigInt
     }
@@ -304,27 +296,42 @@ export interface SocketStatistic {
      */
     api: {
         /**
-         * The number of in-use messages
+         * The number of active messages
          */
         messages: number;
 
         /**
-         * The number of in-use sessions
+         * The number of active builtin sessions
          */
-        sessions: number;
+        builtinSessions: number;
 
         /**
-         * The number of in-use arrays of channels
+         * The number of active plugin sessions
          */
-        channelsArrays: number;
+        pluginSessions: number;
+
+        /**
+         * The number of active builtin channels
+         */
+        builtinChannels: number;
+
+        /**
+         * The number of active plugin channels
+         */
+        pluginChannels: number;
+
+        /**
+         * The number of active session disconnecting requests
+         */
+        sessionDisconnectRequests: number;
     }
 
     /**
      * The data context statistic
      */
-    bufferContext: {
+    buffer: {
         /**
-         * The number of in-use buffers
+         * The number of active buffers
          */
         buffers: number;
     }
@@ -344,17 +351,17 @@ export interface SocketStatistic {
         workerTasks: number;
 
         /**
-         * The number of in-use work groups
+         * The number of active work groups
          */
         workersGroups: number;
 
         /**
-         * The number of in-use deferred works
+         * The number of active deferred works
          */
         deferredTasks: number;
 
         /**
-         * The number of in-use sending commands
+         * The number of active sending commands
          */
         sendCommands: number;
 
@@ -374,34 +381,49 @@ export interface SocketStatistic {
      */
     protocol: {
         /**
-         * The number of in-use packets in protocol layer
+         * The number of active senders
+         */
+        senders: number;
+
+        /**
+         * The number of active receivers
+         */
+        receivers: number;
+
+        /**
+         * The number of active packets
          */
         packets: number;
 
         /**
-         * The number of in-use receiving passes
-         */
-        recvPasses: number;
-
-        /**
-         * The number of in-use sending passes
-         */
-        sendPasses: number;
-
-        /**
-         * The number of bytes of all valid packets
-         */
-        recvValidBytes: number;
-
-        /**
-         * The number of bytes of all invalid packets
-         */
-        recvInvalidBytes: number;
-
-        /**
-         * The number of peers
+         * The number of active peers
          */
         peers: number;
+
+        /**
+         * The number of active servers
+         */
+        servers: number;
+
+        /**
+         * The number of active clients
+         */
+        clients: number;
+
+        /**
+         * The number of active crypto contexts
+         */
+        cryptoContexts: number;
+        
+        /**
+         * The number of accepted connections
+         */
+        acceptances: number;
+
+        /**
+         * The number of peer disconnect requests
+         */
+        peerDisconnectRequests: number;
     }
 
     /**
@@ -409,32 +431,52 @@ export interface SocketStatistic {
      */
     delivery: {
         /**
-         * The number of in-use endpoints
+         * The number of active dispatchers
+         */
+        dispatchers: number;
+
+        /**
+         * The number of active senders
+         */
+        senders: number;
+
+        /**
+         * The number of active receivers
+         */
+        receivers: number;
+
+        /**
+         * The number of active transporters
+         */
+        transporters: number;
+
+        /**
+         * The number of active endpoints
          */
         endpoints: number;
 
         /**
-         * The number of in-use sending commands
+         * The number of active buses
          */
-        sendCommands: number;
+        buses: number;
 
         /**
-         * The number of in-use receiving commands
+         * The number of active recv records
          */
-        recvCommands: number;
+        recvRecords: number;
 
         /**
-         * The number of in-use fragments
+         * The number of active send results
          */
-        fragments: number;
+        sendResults: number;
 
         /**
-         * The number of in-use lists of fragments
+         * The number of active send records
          */
-        fragmentsLists: number;
+        sendRecords: number;
 
         /**
-         * The number of in-use parcels
+         * The number of active parcels
          */
         parcels: number;
     },
@@ -515,24 +557,22 @@ export class Socket {
 
     /**
      * Stop the socket
-     * @returns Returns a promise which resolves when the socket stops
-     * completely.
      */
-    stop(): Promise<void>;
+    stop(): void;
 
     /**
-     * Send a message to multiple recipients
+     * Send a message to multiple recipients.
      * @param channelIndex The sending channel index
      * @param message The message
      * @param recipients List of recipients
-     * @returns Number of sent messages
+     * @returns Returns a promise which will resolve to the number of sent
+     * messages
      */
-    send(channelIndex: number, message: Message, recipients: Session[]): number;
-
-    /**
-     * Get the socket statistic
-     */
-    statistic(): SocketStatistic;
+    send(
+        channelIndex: number,
+        message: Message,
+        recipients: Session[]
+    ): Promise<number>;
 
     /**
      * Get synchronized socket time
@@ -614,3 +654,15 @@ export namespace Plugin {
      */
     function registerPluginByPath(path: string): boolean;
 }
+
+
+/**
+ * Get the statistic of pomelo
+ */
+export function statistic(): Statistic;
+
+/**
+ * Set the error handler
+ * @param {function} handler 
+ */
+export function setErrorHandler(handler: (error: Error) => void): void;

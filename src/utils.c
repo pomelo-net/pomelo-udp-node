@@ -398,27 +398,27 @@ int pomelo_node_get_int64_property(
 }
 
 
-napi_value pomelo_node_error_create(napi_env env, const char * message) {
-    napi_value err_msg = NULL;
-    napi_call(napi_create_string_utf8(
-        env, message, NAPI_AUTO_LENGTH, &err_msg
-    ));
-    napi_value error = NULL;
-    napi_call(napi_create_error(env, NULL, err_msg, &error));
-    return error;
+napi_status pomelo_node_error_create(
+    napi_env env,
+    const char * message,
+    napi_value * error
+) {
+    napi_value msg = NULL;
+    napi_status status = napi_create_string_utf8(
+        env, message, NAPI_AUTO_LENGTH, &msg
+    );
+    if (status != napi_ok) return status;
+
+    status = napi_create_error(env, NULL, msg, error);
+    if (status != napi_ok) return status;
+
+    return status;
 }
 
 
 /* -------------------------------------------------------------------------- */
 /*                            Promise utilities                               */
 /* -------------------------------------------------------------------------- */
-
-void pomelo_node_promise_cancel_deferred(napi_env env, napi_deferred deferred) {
-    napi_value error =
-        pomelo_node_error_create(env, POMELO_NODE_ERROR_CANCELED);
-    if (!error) return;
-    napi_callv(napi_reject_deferred(env, deferred, error));
-}
 
 
 napi_value pomelo_node_promise_reject_error(
@@ -428,7 +428,8 @@ napi_value pomelo_node_promise_reject_error(
     napi_value result = NULL;
     napi_deferred deferred = NULL;
     napi_call(napi_create_promise(env, &deferred, &result));
-    napi_value error = pomelo_node_error_create(env, message);
+    napi_value error = NULL;
+    napi_call(pomelo_node_error_create(env, message, &error));
     if (!error) return NULL;
     napi_call(napi_reject_deferred(env, deferred, error));
     return result;

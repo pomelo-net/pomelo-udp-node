@@ -11,7 +11,7 @@ extern "C" {
 /// @brief The binding node message
 typedef struct pomelo_node_message_s pomelo_node_message_t;
 
-/// @brief The binding node session structure
+/// @brief The binding node session
 typedef struct pomelo_node_session_s pomelo_node_session_t;
 
 /// @brief The binding node socket
@@ -40,19 +40,15 @@ napi_value pomelo_node_main(napi_env env, napi_value exports);
 /* -------------------------------------------------------------------------- */
 
 /// @brief Initialize all enums
-napi_status pomelo_node_init_all_enums(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value ns
-);
+napi_status pomelo_node_init_enums(napi_env env, napi_value ns);
 
 
 /// @brief Initialize all modules
-napi_status pomelo_node_init_all_modules(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value ns
-);
+napi_status pomelo_node_init_modules(napi_env env, napi_value ns);
+
+
+/// @brief Initialize all global functions
+napi_status pomelo_node_init_functions(napi_env env, napi_value ns);
 
 
 #ifdef __cplusplus

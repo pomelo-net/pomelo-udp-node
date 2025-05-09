@@ -52,6 +52,8 @@ const clientListener = {
     }
 };
 
+let stopped = false;
+
 const serverListener = {
     onConnected: function(session) {
         console.log(`Server session has connected ${session.id}`);
@@ -60,7 +62,6 @@ const serverListener = {
     onDisconnected: function(session) {
         try {
             console.log(`Server session has disconnected ${session.id}`);
-            server.stop();
         } catch (err) {
             console.error(err);
         }
@@ -80,14 +81,15 @@ const serverListener = {
         const v3 = message.readInt8();
         console.log(`v3 = ${v3} ${v3 === 1 ? "OK" : "Failed"}`);
 
-        console.log("Stopping sockets");
-        client.stop()
-        .then(() => console.log("Client stopped"))
-        .catch(err => console.error(err));
+        if (stopped) {
+            return;
+        }
 
-        server.stop()
-        .then(() => console.log("Server stopped"))
-        .catch(err => console.error(err));
+        stopped = true;
+
+        console.log("Stopping sockets");
+        client.stop();
+        server.stop();
     }
 };
 
@@ -103,22 +105,22 @@ export default function testSocket() {
     server = new Socket(CHANNELS);
     server.setListener(serverListener);
 
-    let ret = server.listen(
+    server.listen(
         privateKey,
         PROTOCOL_ID,
         MAX_CLIENTS,
         ADDRESS
-    );
-    if (!ret) {
-        console.log("Failed to start server");
-        return ret;
-    }
+    ).then(() => {
+        console.log("Server is listening");
+    }).catch((err) => {
+        console.error("Failed to listen: ", err);
+    });
 
-    ret = client.connect(token);
-    if (!ret) {
-        console.log("Failed to start client");
-        return ret;
-    }
+    client.connect(token).then((ret) => {
+        console.log("Connect result: ", ret);
+    }).catch((err) => {
+        console.error("Failed to connect: ", err);
+    });
 
     return true;
 }

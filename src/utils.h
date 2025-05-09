@@ -166,15 +166,16 @@ int pomelo_node_get_int64_property(
 /* -------------------------------------------------------------------------- */
 
 /// @brief Create an error with message
-napi_value pomelo_node_error_create(napi_env env, const char * message);
+napi_status pomelo_node_error_create(
+    napi_env env,
+    const char * message,
+    napi_value * error
+);
 
 
 /* -------------------------------------------------------------------------- */
 /*                            Promise utilities                               */
 /* -------------------------------------------------------------------------- */
-
-/// @brief Cancel deferred
-void pomelo_node_promise_cancel_deferred(napi_env env, napi_deferred deferred);
 
 /// @brief Reject with an error
 napi_value pomelo_node_promise_reject_error(napi_env env, const char * message);

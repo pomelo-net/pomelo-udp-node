@@ -13,11 +13,11 @@
 /*                                Public APIs                                 */
 /*----------------------------------------------------------------------------*/
 
-napi_status pomelo_node_init_message_module(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value ns
-) {
+napi_status pomelo_node_init_message_module(napi_env env, napi_value ns) {
+    pomelo_node_context_t * context = NULL;
+    napi_calls(napi_get_instance_data(env, (void **) &context));
+    assert(context != NULL);
+    
     napi_property_descriptor message_descriptors[] = {
         napi_method("write", pomelo_node_message_write, context),
         napi_method("writeUint8", pomelo_node_message_write_uint8, context),
@@ -42,9 +42,7 @@ napi_status pomelo_node_init_message_module(
         napi_method("readFloat32", pomelo_node_message_read_float32, context),
         napi_method("readFloat64", pomelo_node_message_read_float64, context),
         napi_method("reset", pomelo_node_message_reset, context),
-        napi_method("size", pomelo_node_message_size, context),
-        napi_static_method("acquire", pomelo_node_message_acquire, context),
-        napi_static_method("release", pomelo_node_message_release, context),
+        napi_method("size", pomelo_node_message_size, context)
     };
 
     // Build the class
@@ -67,33 +65,64 @@ napi_status pomelo_node_init_message_module(
 }
 
 
-napi_value pomelo_node_message_new(
-    napi_env env,
-    pomelo_node_context_t * context,
-    pomelo_message_t * message
-) {
-    // Try to get from pool
-    napi_value value = pomelo_node_message_acquire_ex(env, context);
-    if (!value) return NULL;
+napi_value pomelo_node_message_new(napi_env env, pomelo_message_t * message) {
+    // Get the context
+    pomelo_node_context_t * context = NULL;
+    napi_call(napi_get_instance_data(env, (void **) &context));
+    assert(context != NULL);
 
-    // Attach native message
+    // Get the class
+    napi_value clazz = NULL;
+    napi_call(napi_get_reference_value(env, context->class_message, &clazz));
+
+    // Create external value to wrap the native message
+    napi_value external = NULL;
+    napi_call(napi_create_external(env, message, NULL, NULL, &external));
+
+    // Create new instance
+    napi_value js_message = NULL;
+    napi_value argv[] = { external };
+    napi_call(napi_new_instance(
+        env,
+        clazz,
+        sizeof(argv) / sizeof(argv[0]),
+        argv,
+        &js_message
+    ));
+
+    // Get the node message
     pomelo_node_message_t * node_message = NULL;
-    napi_call(napi_unwrap(env, value, (void **) &node_message));
-    if (message) {
-        node_message->message = message;
-        pomelo_message_set_extra(message, node_message);
-        pomelo_message_ref(message);
-    }
-    return value;
+    napi_call(napi_unwrap(env, js_message, (void **) &node_message));
+
+    return js_message;
 }
 
 
-void pomelo_node_message_delete(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value js_message
+int pomelo_node_message_init(
+    pomelo_node_message_t * node_message,
+    pomelo_node_context_t * context
 ) {
-    pomelo_node_message_release_ex(env, context, js_message);
+    assert(node_message != NULL);
+    node_message->context = context;
+    return 0;
+}
+
+
+void pomelo_node_message_cleanup(pomelo_node_message_t * node_message) {
+    assert(node_message != NULL);
+
+    // Release the native message
+    if (node_message->message) {
+        pomelo_message_set_extra(node_message->message, NULL);
+        pomelo_message_unref(node_message->message);
+        node_message->message = NULL;
+    }
+
+    // Delete the reference
+    if (node_message->thiz) {
+        napi_delete_reference(node_message->context->env, node_message->thiz);
+        node_message->thiz = NULL;
+    }
 }
 
 
@@ -101,14 +130,17 @@ void pomelo_node_message_delete(
 /*                                Private APIs                                */
 /*----------------------------------------------------------------------------*/
 
+#define POMELO_NODE_MESSAGE_CONSTRUCTOR_ARGC 1
 napi_value pomelo_node_message_constructor(
     napi_env env,
     napi_callback_info info
 ) {
+    size_t argc = POMELO_NODE_MESSAGE_CONSTRUCTOR_ARGC;
+    napi_value argv[POMELO_NODE_MESSAGE_CONSTRUCTOR_ARGC] = { NULL };
     napi_value thiz = NULL;
     pomelo_node_context_t * context = NULL;
     napi_call(napi_get_cb_info(
-        env, info, NULL, NULL, &thiz, (void **) &context
+        env, info, &argc, argv, &thiz, (void **) &context
     ));
 
     // Check if this call is a constructor call
@@ -119,26 +151,50 @@ napi_value pomelo_node_message_constructor(
         return NULL;
     }
 
-    // Create new node message
-    pomelo_node_message_t * node_message =
-        pomelo_node_context_create_node_message(context);
-    if (!node_message) {
+    pomelo_message_t * message = NULL;
+    if (argc > 0) {
+        napi_valuetype type;
+        napi_call(napi_typeof(env, argv[0], &type));
+        if (type != napi_external) {
+            napi_throw_msg(POMELO_NODE_ERROR_INVALID_ARG);
+            return NULL;
+        }
+        napi_call(napi_get_value_external(env, argv[0], (void **) &message));
+        pomelo_message_ref(message);
+    } else {
+        message = pomelo_context_acquire_message(context->context);
+    }
+
+    if (message == NULL) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
     }
+
+    // Create new node message
+    pomelo_node_message_t * node_message =
+        pomelo_node_context_acquire_message(context);
+    if (!node_message) {
+        pomelo_message_unref(message);
+        napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
+        return NULL;
+    }
+
+    // Attach the native message
+    node_message->message = message;
+    pomelo_message_set_extra(message, node_message);
     
     // Wrap the message
     napi_status status = napi_wrap(
         env,
         thiz,
         node_message,
-        (napi_finalize) pomelo_node_message_finalize,
+        (napi_finalize) pomelo_node_message_finalizer,
         context,
         &node_message->thiz
     );
 
     if (status != napi_ok) {
-        pomelo_node_message_finalize(env, node_message, context);
+        pomelo_node_context_release_message(context, node_message);
         return NULL;
     }
 
@@ -147,23 +203,14 @@ napi_value pomelo_node_message_constructor(
 }
 
 
-void pomelo_node_message_finalize(
+void pomelo_node_message_finalizer(
     napi_env env,
     pomelo_node_message_t * node_message,
     pomelo_node_context_t * context
 ) {
-    // Release native message
-    if (node_message->message) {
-        pomelo_message_unref(node_message->message);
-        node_message->message = NULL;
-    }
-
-    // Release the reference
-    napi_delete_reference(env, node_message->thiz);
-    node_message->thiz = NULL;
-
+    (void) env;
     // Release the node message
-    pomelo_node_context_destroy_node_message(context, node_message);
+    pomelo_node_context_release_message(context, node_message);
 }
 
 
@@ -180,16 +227,14 @@ napi_value pomelo_node_message_reset(napi_env env, napi_callback_info info) {
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
+    pomelo_message_t * message = node_message->message;
+    if (!message) {
+        napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
+        return NULL;
     }
 
-    // Detach the native message from JS message
-    if (node_message->message) {
-        pomelo_message_unref(node_message->message);
-        node_message->message = NULL;
-    }
+    // Reset the message
+    pomelo_message_reset(message);
 
     napi_value undefined = NULL;
     napi_call(napi_get_undefined(env, &undefined));
@@ -209,14 +254,13 @@ napi_value pomelo_node_message_size(napi_env env, napi_callback_info info) {
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
+    pomelo_message_t * message = node_message->message;
+    if (!message) {
+        napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
+        return NULL;
     }
 
-    pomelo_message_t * message = node_message->message;
-    size_t size = message ? pomelo_message_size(message) : 0;
-
+    size_t size = pomelo_message_size(message);
     napi_value ret_val;
     napi_call(napi_create_uint32(env, (uint32_t) size, &ret_val));
     return ret_val;
@@ -237,11 +281,6 @@ napi_value pomelo_node_message_read(napi_env env, napi_callback_info info) {
     napi_call(pomelo_node_validate_native(
         env, thiz, context->class_message, (void **) &node_message
     ));
-
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     pomelo_message_t * message = node_message->message;
     if (!message) {
@@ -275,7 +314,7 @@ napi_value pomelo_node_message_read(napi_env env, napi_callback_info info) {
     napi_call(napi_create_arraybuffer(env, size, (void **) &buffer, &arrbuf));
 
     // Read data from message
-    if (pomelo_message_read_buffer(message, size, buffer) < 0) {
+    if (pomelo_message_read_buffer(message, buffer, size) < 0) {
         napi_throw_msg(POMELO_NODE_ERROR_READ_MESSAGE);
         return NULL;
     }
@@ -303,11 +342,6 @@ napi_value pomelo_node_message_read_uint8(
     napi_call(pomelo_node_validate_native(
         env, thiz, context->class_message, (void **) &node_message
     ));
-
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     pomelo_message_t * message = node_message->message;
     if (!message) {
@@ -343,10 +377,6 @@ napi_value pomelo_node_message_read_uint16(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     pomelo_message_t * message = node_message->message;
     if (!message) {
@@ -382,11 +412,6 @@ napi_value pomelo_node_message_read_uint32(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
-
     pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
@@ -421,10 +446,6 @@ napi_value pomelo_node_message_read_uint64(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     pomelo_message_t * message = node_message->message;
     if (!message) {
@@ -460,10 +481,6 @@ napi_value pomelo_node_message_read_int8(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     pomelo_message_t * message = node_message->message;
     if (!message) {
@@ -499,10 +516,6 @@ napi_value pomelo_node_message_read_int16(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     pomelo_message_t * message = node_message->message;
     if (!message) {
@@ -538,10 +551,6 @@ napi_value pomelo_node_message_read_int32(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     pomelo_message_t * message = node_message->message;
     if (!message) {
@@ -577,10 +586,6 @@ napi_value pomelo_node_message_read_int64(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     pomelo_message_t * message = node_message->message;
     if (!message) {
@@ -616,10 +621,6 @@ napi_value pomelo_node_message_read_float32(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     pomelo_message_t * message = node_message->message;
     if (!message) {
@@ -655,11 +656,6 @@ napi_value pomelo_node_message_read_float64(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
-
     pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
@@ -679,19 +675,6 @@ napi_value pomelo_node_message_read_float64(
 }
 
 
-pomelo_message_t * pomelo_node_message_prepare_write(
-    pomelo_node_context_t * context,
-    pomelo_node_message_t * node_message
-) {
-    pomelo_message_t * message = node_message->message;
-    if (message) return message;
-    message =
-        pomelo_message_new((pomelo_context_t *) context->context);
-    node_message->message = message;
-    return message;
-}
-
-
 #define POMELO_NODE_MESSAGE_WRITE_ARGC 1
 napi_value pomelo_node_message_write(napi_env env, napi_callback_info info) {
     size_t argc = POMELO_NODE_MESSAGE_WRITE_ARGC;
@@ -707,18 +690,12 @@ napi_value pomelo_node_message_write(napi_env env, napi_callback_info info) {
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
-
     if (argc < POMELO_NODE_MESSAGE_WRITE_ARGC) { 
         napi_throw_msg(POMELO_NODE_ERROR_NOT_ENOUGH_ARGS);
         return NULL;
     }
 
-    pomelo_message_t * message =
-        pomelo_node_message_prepare_write(context, node_message);
+    pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
@@ -743,7 +720,7 @@ napi_value pomelo_node_message_write(napi_env env, napi_callback_info info) {
         return result;
     }
 
-    if (pomelo_message_write_buffer(message, length, buffer) < 0) {
+    if (pomelo_message_write_buffer(message, buffer, length) < 0) {
         napi_throw_msg(POMELO_NODE_ERROR_WRITE_MESSAGE);
         return NULL;
     }
@@ -771,18 +748,13 @@ napi_value pomelo_node_message_write_uint8(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     if (argc < POMELO_NODE_MESSAGE_WRITE_ARGC) { 
         napi_throw_msg(POMELO_NODE_ERROR_NOT_ENOUGH_ARGS);
         return NULL;
     }
 
-    pomelo_message_t * message =
-        pomelo_node_message_prepare_write(context, node_message);
+    pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
@@ -822,18 +794,13 @@ napi_value pomelo_node_message_write_uint16(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     if (argc < POMELO_NODE_MESSAGE_WRITE_ARGC) { 
         napi_throw_msg(POMELO_NODE_ERROR_NOT_ENOUGH_ARGS);
         return NULL;
     }
 
-    pomelo_message_t * message =
-        pomelo_node_message_prepare_write(context, node_message);
+    pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
@@ -873,18 +840,13 @@ napi_value pomelo_node_message_write_uint32(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     if (argc < POMELO_NODE_MESSAGE_WRITE_ARGC) { 
         napi_throw_msg(POMELO_NODE_ERROR_NOT_ENOUGH_ARGS);
         return NULL;
     }
 
-    pomelo_message_t * message =
-        pomelo_node_message_prepare_write(context, node_message);
+    pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
@@ -924,18 +886,13 @@ napi_value pomelo_node_message_write_uint64(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     if (argc < POMELO_NODE_MESSAGE_WRITE_ARGC) { 
         napi_throw_msg(POMELO_NODE_ERROR_NOT_ENOUGH_ARGS);
         return NULL;
     }
 
-    pomelo_message_t * message =
-        pomelo_node_message_prepare_write(context, node_message);
+    pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
@@ -975,18 +932,13 @@ napi_value pomelo_node_message_write_int8(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     if (argc < POMELO_NODE_MESSAGE_WRITE_ARGC) { 
         napi_throw_msg(POMELO_NODE_ERROR_NOT_ENOUGH_ARGS);
         return NULL;
     }
 
-    pomelo_message_t * message =
-        pomelo_node_message_prepare_write(context, node_message);
+    pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
@@ -1026,18 +978,13 @@ napi_value pomelo_node_message_write_int16(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     if (argc < POMELO_NODE_MESSAGE_WRITE_ARGC) { 
         napi_throw_msg(POMELO_NODE_ERROR_NOT_ENOUGH_ARGS);
         return NULL;
     }
 
-    pomelo_message_t * message =
-        pomelo_node_message_prepare_write(context, node_message);
+    pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
@@ -1077,18 +1024,13 @@ napi_value pomelo_node_message_write_int32(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     if (argc < POMELO_NODE_MESSAGE_WRITE_ARGC) { 
         napi_throw_msg(POMELO_NODE_ERROR_NOT_ENOUGH_ARGS);
         return NULL;
     }
 
-    pomelo_message_t * message =
-        pomelo_node_message_prepare_write(context, node_message);
+    pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
@@ -1128,18 +1070,13 @@ napi_value pomelo_node_message_write_int64(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     if (argc < POMELO_NODE_MESSAGE_WRITE_ARGC) { 
         napi_throw_msg(POMELO_NODE_ERROR_NOT_ENOUGH_ARGS);
         return NULL;
     }
 
-    pomelo_message_t * message =
-        pomelo_node_message_prepare_write(context, node_message);
+    pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
@@ -1179,18 +1116,13 @@ napi_value pomelo_node_message_write_float32(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     if (argc < POMELO_NODE_MESSAGE_WRITE_ARGC) { 
         napi_throw_msg(POMELO_NODE_ERROR_NOT_ENOUGH_ARGS);
         return NULL;
     }
 
-    pomelo_message_t * message =
-        pomelo_node_message_prepare_write(context, node_message);
+    pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
@@ -1230,18 +1162,13 @@ napi_value pomelo_node_message_write_float64(
         env, thiz, context->class_message, (void **) &node_message
     ));
 
-    if (node_message->pool_node) {
-        napi_throw_msg(POMELO_NODE_ERROR_MESSAGE_RELEASED);
-        return NULL; // Released message
-    }
 
     if (argc < POMELO_NODE_MESSAGE_WRITE_ARGC) { 
         napi_throw_msg(POMELO_NODE_ERROR_NOT_ENOUGH_ARGS);
         return NULL;
     }
 
-    pomelo_message_t * message =
-        pomelo_node_message_prepare_write(context, node_message);
+    pomelo_message_t * message = node_message->message;
     if (!message) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
@@ -1261,107 +1188,4 @@ napi_value pomelo_node_message_write_float64(
     napi_value result = NULL;
     napi_call(napi_get_undefined(env, &result));
     return result;
-}
-
-
-napi_value pomelo_node_message_acquire(napi_env env, napi_callback_info info) {
-    pomelo_node_context_t * context = NULL;
-    napi_call(napi_get_cb_info(
-        env, info, NULL, NULL, NULL, (void **) &context
-    ));
-    return pomelo_node_message_acquire_ex(env, context);
-}
-
-
-napi_value pomelo_node_message_acquire_ex(
-    napi_env env,
-    pomelo_node_context_t * context
-) {
-    pomelo_list_t * pool = context->pool_message;
-    napi_value js_message = NULL;
-
-    if (pool->size == 0) {
-        // Construct new one
-        napi_value clazz = NULL;
-        napi_call(napi_get_reference_value(
-            env, context->class_message, &clazz
-        ));
-        napi_call(napi_new_instance(env, clazz, 0, NULL, &js_message));
-    } else {
-        // Acquire from list
-        pomelo_node_message_t * node_message = NULL;
-        pomelo_list_pop_front(pool, &node_message);
-        node_message->pool_node = NULL;
-        napi_call(napi_get_reference_value(
-            env, node_message->thiz, &js_message
-        ));
-        napi_call(napi_reference_unref(env, node_message->thiz, NULL));
-    }
-
-    return js_message;
-}
-
-
-#define POMELO_NODE_MESSAGE_ACQUIRE_ARGC 1
-napi_value pomelo_node_message_release(napi_env env, napi_callback_info info) {
-    size_t argc = POMELO_NODE_MESSAGE_ACQUIRE_ARGC;
-    napi_value argv[POMELO_NODE_MESSAGE_ACQUIRE_ARGC] = { NULL };
-    pomelo_node_context_t * context = NULL;
-    napi_call(napi_get_cb_info(
-        env, info, &argc, argv, NULL, (void **) &context
-    ));
-
-    if (argc < POMELO_NODE_MESSAGE_ACQUIRE_ARGC) {
-        napi_throw_msg(POMELO_NODE_ERROR_NOT_ENOUGH_ARGS);
-        return NULL;
-    }
-
-    napi_value js_message = argv[0];
-    napi_value clazz = NULL;
-    napi_call(napi_get_reference_value(env, context->class_message, &clazz));
-
-    bool instance_of = false;
-    napi_call(napi_instanceof(env, js_message, clazz, &instance_of));
-    if (!instance_of) {
-        napi_throw_arg("message");
-        return NULL;
-    }
-    pomelo_node_message_release_ex(env, context, js_message);
-
-    napi_value result;
-    napi_call(napi_get_undefined(env, &result));
-    return result;
-}
-
-
-void pomelo_node_message_release_ex(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value js_message
-) {
-    // Unwrap node message and release the native message
-    pomelo_node_message_t * node_message = NULL;
-    napi_callv(napi_unwrap(env, js_message, (void **) &node_message));
-    if (node_message->message) {
-        pomelo_message_set_extra(node_message->message, NULL);
-        pomelo_message_unref(node_message->message);
-        node_message->message = NULL;
-    }
-
-    // Check capacity of messages pool
-    pomelo_list_t * pool = context->pool_message;
-    if (context->pool_message->size > context->pool_message_max) return;
-
-    // Append message ref to pool
-    node_message->pool_node = pomelo_list_push_back(pool, node_message);
-    if (node_message->pool_node) {
-        // Retain the message
-        napi_callv(napi_reference_ref(env, node_message->thiz, NULL));
-    }
-}
-
-
-void pomelo_message_on_released(pomelo_message_t * message) {
-    (void) message;
-    // Ingore
 }

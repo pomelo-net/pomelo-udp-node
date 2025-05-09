@@ -10,3 +10,6 @@ export const CHANNEL_MODES = [
 
 export const ADDRESS_HOST = "127.0.0.1";
 export const ADDRESS_PORT = 8888;
+
+export const SERVICE_HOST = "127.0.0.1";
+export const SERVICE_PORT = 8889;

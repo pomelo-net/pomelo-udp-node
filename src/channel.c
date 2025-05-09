@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdio.h>
 #include "channel.h"
 #include "utils.h"
 #include "context.h"
@@ -10,11 +11,12 @@
 /*                               Public APIs                                  */
 /*----------------------------------------------------------------------------*/
 
-napi_status pomelo_node_init_channel_module(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value ns
-) {
+
+napi_status pomelo_node_init_channel_module(napi_env env, napi_value ns) {
+    pomelo_node_context_t * context = NULL;
+    napi_calls(napi_get_instance_data(env, (void **) &context));
+    assert(context != NULL);
+
     napi_property_descriptor properties[] = {
         napi_property(
             "mode",
@@ -42,63 +44,58 @@ napi_status pomelo_node_init_channel_module(
 }
 
 
-napi_value pomelo_node_channel_new(
-    napi_env env,
-    pomelo_node_context_t * context,
-    pomelo_channel_t * channel
-) {
-    pomelo_list_t * pool = context->pool_channel;
+napi_value pomelo_node_channel_new(napi_env env, pomelo_channel_t * channel) {
+    // Get the context
+    pomelo_node_context_t * context = NULL;
+    napi_call(napi_get_instance_data(env, (void **) &context));
+    assert(context != NULL);
+
+    // Get the class
+    napi_value clazz = NULL;
+    napi_call(napi_get_reference_value(env, context->class_channel, &clazz));
+
+    // Create new instance
     napi_value js_channel = NULL;
+    napi_call(napi_new_instance(env, clazz, 0, NULL, &js_channel));
+
+    // Get the node channel
     pomelo_node_channel_t * node_channel = NULL;
-
-    if (pool->size == 0) {
-        napi_value clazz = NULL;
-        napi_call(napi_get_reference_value(
-            env, context->class_channel, &clazz
-        ));
-        napi_call(napi_new_instance(env, clazz, 0, NULL, &js_channel));
-        napi_call(napi_unwrap(env, js_channel, (void **) &node_channel));
-
-        // Ref the reference
-        napi_call(napi_reference_ref(env, node_channel->thiz, NULL));
-    } else {
-        pomelo_list_pop_back(pool, &node_channel);
-        node_channel->pool_node = NULL;
-        napi_call(napi_get_reference_value(
-            env, node_channel->thiz, &js_channel
-        ));
-        // Keep the reference
-    }
+    napi_call(napi_unwrap(env, js_channel, (void **) &node_channel));
 
     // Attach the native channel
     node_channel->channel = channel;
     pomelo_channel_set_extra(channel, node_channel);
 
+    // Ref the reference to keep the channel alive
+    napi_call(napi_reference_ref(env, node_channel->thiz, NULL));
+
     return js_channel;
 }
 
 
-void pomelo_node_channel_delete(
-    napi_env env,
-    pomelo_node_context_t * context,
-    pomelo_node_channel_t * node_channel
+int pomelo_node_channel_init(
+    pomelo_node_channel_t * node_channel,
+    pomelo_node_context_t * context
 ) {
-    pomelo_list_t * pool = context->pool_channel;
-    if (!node_channel->channel) return;
+    assert(node_channel != NULL);
+    node_channel->context = context;
+    return 0;
+}
 
-    pomelo_channel_set_extra(node_channel->channel, NULL);
-    node_channel->channel = NULL;
 
-    if (context->pool_channel->size >= context->pool_channel_max) {
-        // Just unref channel
-        napi_callv(napi_reference_unref(env, node_channel->thiz, NULL));
-        return;
+void pomelo_node_channel_cleanup(pomelo_node_channel_t * node_channel) {
+    assert(node_channel != NULL);
+
+    // Unset the native channel
+    if (node_channel->channel) {
+        pomelo_channel_set_extra(node_channel->channel, NULL);
+        node_channel->channel = NULL;
     }
 
-    // Keep the reference
-    node_channel->pool_node = pomelo_list_push_back(pool, node_channel);
-    if (!node_channel->pool_node) {
-        napi_callv(napi_reference_unref(env, node_channel->thiz, NULL));
+    // Delete the reference
+    if (node_channel->thiz) {
+        napi_delete_reference(node_channel->context->env, node_channel->thiz);
+        node_channel->thiz = NULL;
     }
 }
 
@@ -127,7 +124,7 @@ napi_value pomelo_node_channel_constructor(
 
     // Create new node channel
     pomelo_node_channel_t * node_channel =
-        pomelo_node_context_create_node_channel(context);
+        pomelo_node_context_acquire_channel(context);
     if (!node_channel) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
@@ -138,33 +135,37 @@ napi_value pomelo_node_channel_constructor(
         env,
         thiz,
         node_channel,
-        (napi_finalize) pomelo_node_channel_finalize,
+        (napi_finalize) pomelo_node_channel_finalizer,
         context,
         &node_channel->thiz
     );
-
     if (status != napi_ok) {
-        pomelo_node_channel_finalize(env, node_channel, context);
+        pomelo_node_context_release_channel(context, node_channel);
+        assert(false);
         return NULL;
     }
 
-    // This will create weak ref of channel
     return thiz;
 }
 
 
-void pomelo_node_channel_finalize(
+void pomelo_node_channel_finalizer(
     napi_env env,
     pomelo_node_channel_t * node_channel,
     pomelo_node_context_t * context
 ) {
-    // Release the reference
-    napi_delete_reference(env, node_channel->thiz);
-    node_channel->thiz = NULL;
+    (void) env;
+    // The channels are always strong references, so that, this finalizer is
+    // not called in normal cases.
 
-    // Release the node message
-    pomelo_node_context_destroy_node_channel(context, node_channel);
+    // Release the channel.
+    pomelo_node_context_release_channel(context, node_channel);
 }
+
+
+/*----------------------------------------------------------------------------*/
+/*                              Private APIs                                  */
+/*----------------------------------------------------------------------------*/
 
 
 #define POMELO_NODE_CHANNEL_SET_MODE_ARGC 1
@@ -245,9 +246,6 @@ napi_value pomelo_node_channel_get_mode(napi_env env, napi_callback_info info) {
 
 #define POMELO_NODE_CHANNEL_SEND_ARGC 1
 napi_value pomelo_node_channel_send(napi_env env, napi_callback_info info) {
-    // After sending the message, the native message associated with JS message
-    // will be disassociated. This will make sure it will not be unreferenced
-    // when the JS message is finalized.
     size_t argc = POMELO_NODE_CHANNEL_SEND_ARGC;
     napi_value argv[POMELO_NODE_CHANNEL_SEND_ARGC] = { NULL };
     napi_value thiz = NULL;
@@ -293,18 +291,29 @@ napi_value pomelo_node_channel_send(napi_env env, napi_callback_info info) {
         return NULL;
     }
 
-    // Delivery the message
-    int ret = pomelo_channel_send(node_channel->channel, node_message->message);
-    if (ret == 0) {
-        // Detach native message
-        node_message->message = NULL;
-
-        // Release JS message
-        pomelo_node_message_delete(env, context, js_message);
-    }
-
-    // return: boolean
+    // Create promise here
     napi_value result = NULL;
-    napi_call(napi_get_boolean(env, ret == 0, &result));
-    return result;
+    napi_deferred deferred = NULL;
+    napi_call(napi_create_promise(env, &deferred, &result));
+
+    // Delivery the message
+    pomelo_channel_send(
+        node_channel->channel,
+        node_message->message,
+        deferred
+    );
+
+    return result; // Promise<number>
+}
+
+
+/* -------------------------------------------------------------------------- */
+/*                            Implemented APIs                                */
+/* -------------------------------------------------------------------------- */
+
+void pomelo_channel_on_cleanup(pomelo_channel_t * channel) {
+    pomelo_node_channel_t * node_channel = pomelo_channel_get_extra(channel);
+    if (!node_channel) return; // The channel may not be created
+
+    pomelo_node_context_release_channel(node_channel->context, node_channel);
 }

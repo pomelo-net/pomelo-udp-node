@@ -15,12 +15,12 @@
 /*                               Public APIs                                  */
 /*----------------------------------------------------------------------------*/
 
-napi_status pomelo_node_init_session_module(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value ns
-) {
+napi_status pomelo_node_init_session_module(napi_env env, napi_value ns) {
     (void) ns;
+    pomelo_node_context_t * context = NULL;
+    napi_calls(napi_get_instance_data(env, (void **) &context));
+    assert(context != NULL);
+
     napi_property_descriptor descriptors[] = {
         napi_property("id", pomelo_node_session_get_id, NULL, context),
         napi_property(
@@ -59,98 +59,86 @@ napi_status pomelo_node_init_session_module(
 }
 
 
-napi_value pomelo_node_session_new(
-    napi_env env,
-    pomelo_node_context_t * context,
-    pomelo_session_t * session,
-    pomelo_node_socket_t * node_socket
-) {
-    pomelo_list_t * pool = context->pool_session;
+napi_value pomelo_node_session_new(napi_env env, pomelo_session_t * session) {
+    pomelo_node_context_t * context = NULL;
+    napi_call(napi_get_instance_data(env, (void **) &context));
+    assert(context != NULL);
+
+    // Get the class
+    napi_value clazz = NULL;
+    napi_call(napi_get_reference_value(env, context->class_session, &clazz));
+
+    // Create new instance
     napi_value js_session = NULL;
+    napi_call(napi_new_instance(env, clazz, 0, NULL, &js_session));
+
+    // Get the node session
     pomelo_node_session_t * node_session = NULL;
-
-    if (pool->size == 0) {
-        napi_value clazz = NULL;
-        napi_call(napi_get_reference_value(
-            env, context->class_session, &clazz
-        ));
-        napi_call(napi_new_instance(env, clazz, 0, NULL, &js_session));
-        napi_call(napi_unwrap(env, js_session, (void **) &node_session));
-
-        // Ref the reference
-        napi_call(napi_reference_ref(env, node_session->thiz, NULL));
-    } else {
-        pomelo_list_pop_back(pool, &node_session);
-        node_session->pool_node = NULL;
-        napi_call(napi_get_reference_value(
-            env, node_session->thiz, &js_session
-        ));
-        // Keep the reference
-    }
+    napi_call(napi_unwrap(env, js_session, (void **) &node_session));
 
     // Attach the native session
     node_session->session = session;
-    node_session->node_socket = node_socket;
     pomelo_session_set_extra(session, node_session);
+
+    // Ref the reference to keep the session alive
+    napi_call(napi_reference_ref(env, node_session->thiz, NULL));
 
     return js_session;
 }
 
 
-void pomelo_node_session_delete(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value js_session
+int pomelo_node_session_init(
+    pomelo_node_session_t * node_session,
+    pomelo_node_context_t * context
 ) {
-    pomelo_list_t * pool = context->pool_session;
-    pomelo_node_session_t * node_session = NULL;
-    napi_callv(napi_unwrap(env, js_session, (void **) &node_session));
-    if (!node_session->session) return;
+    assert(node_session != NULL);
+    node_session->context = context;
+    return 0;
+}
 
-    pomelo_session_set_extra(node_session->session, NULL);
-    node_session->session = NULL;
 
-    // Release all channels
+void pomelo_node_session_cleanup(pomelo_node_session_t * node_session) {
+    pomelo_session_t * session = node_session->session;
+    assert(session != NULL);
+
+    if (session) {
+        pomelo_session_set_extra(session, NULL);
+        node_session->session = NULL;
+    }
+
+    // Get the context
+    pomelo_node_context_t * context = node_session->context;
+    assert(context != NULL);
+
+    // Release channels array
+    napi_env env = context->env;
     if (node_session->channels) {
-        napi_callv(napi_delete_reference(env, node_session->channels));
+        napi_delete_reference(env, node_session->channels);
         node_session->channels = NULL;
     }
 
-    pomelo_node_channel_t * node_channel;
-    pomelo_list_for(
-        node_session->list_channels,
-        node_channel,
-        pomelo_node_channel_t *,
-        { pomelo_node_channel_delete(env, context, node_channel); }
-    );
-    pomelo_list_clear(node_session->list_channels);
-
-    if (context->pool_session->size >= context->pool_session_max) {
-        // Just unref session
-        napi_callv(napi_reference_unref(env, node_session->thiz, NULL));
-        return;
-    }
-
-    // Keep the reference
-    node_session->pool_node = pomelo_list_push_back(pool, node_session);
-    if (!node_session->pool_node) {
-        napi_callv(napi_reference_unref(env, node_session->thiz, NULL));
+    // Release the reference to the session
+    if (node_session->thiz) {
+        napi_delete_reference(env, node_session->thiz);
+        node_session->thiz = NULL;
     }
 }
 
 
-napi_value pomelo_node_session_of(
-    napi_env env,
-    pomelo_node_context_t * context,
-    pomelo_session_t * session
-) {
-    (void) context;
+napi_value pomelo_node_js_session_of(pomelo_session_t * session) {
+    assert(session != NULL);
 
     pomelo_node_session_t * node_session = pomelo_session_get_extra(session);
-    if (!node_session) return NULL;
+    assert(node_session != NULL);
 
     napi_value js_session = NULL;
-    napi_call(napi_get_reference_value(env, node_session->thiz, &js_session));
+    napi_call(napi_get_reference_value(
+        node_session->context->env,
+        node_session->thiz,
+        &js_session
+    ));
+
+    assert(js_session != NULL);
     return js_session;
 }
 
@@ -183,51 +171,47 @@ napi_value pomelo_node_session_constructor(
 
     // Create new node session
     pomelo_node_session_t * node_session =
-        pomelo_node_context_create_node_session(context);
+        pomelo_node_context_acquire_session(context);
     if (!node_session) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
     }
 
     // Wrap the session
-    napi_call(napi_wrap(
+    napi_status status = napi_wrap(
         env,
         thiz,
         node_session,
-        (napi_finalize) pomelo_node_session_finalize,
+        (napi_finalize) pomelo_node_session_finalizer,
         context,
         &node_session->thiz
-    ));
+    );
+    if (status != napi_ok) {
+        pomelo_node_context_release_session(context, node_session);
+        assert(false);
+        return NULL;
+    }
 
     return thiz;
 }
 
 
-void pomelo_node_session_finalize(
+void pomelo_node_session_finalizer(
     napi_env env,
     pomelo_node_session_t * node_session,
     pomelo_node_context_t * context
 ) {
-    // When the JS session is finalized, the native session has been removed
-    // before. So we do not do anything with native session here.
+    (void) env;
+    // The sessions are always strong references, so that, this finalizer is
+    // only called when the runtime is shutting down.
 
-    // Remove the reference
-    napi_callv(napi_delete_reference(env, node_session->thiz));
-    node_session->thiz = NULL;
-
-    // And free the node session.
-    pomelo_node_context_destroy_node_session(context, node_session);
+    // Release the session.
+    pomelo_node_context_release_session(context, node_session);
 }
 
 
 #define POMELO_NODE_SESSION_SEND_ARGC 2
-napi_value pomelo_node_session_send(
-    napi_env env,
-    napi_callback_info info
-) {
-    // After sending the message, the native message associated with JS message
-    // will be disassociated. This will make sure it will not be unreferenced
-    // when the JS message is finalized.
+napi_value pomelo_node_session_send(napi_env env, napi_callback_info info) {
     size_t argc = POMELO_NODE_SESSION_SEND_ARGC;
     napi_value argv[POMELO_NODE_SESSION_SEND_ARGC] = { NULL };
     napi_value thiz = NULL;
@@ -280,25 +264,20 @@ napi_value pomelo_node_session_send(
         return NULL;
     }
 
+    // Create promise here
+    napi_value result = NULL;
+    napi_deferred deferred = NULL;
+    napi_call(napi_create_promise(env, &deferred, &result));
+
     // Delivery the message
-    int ret = pomelo_session_send(
+    pomelo_session_send(
         node_session->session,
         channel_index,
-        node_message->message
+        node_message->message,
+        deferred
     );
 
-    if (ret == 0) {
-        // After sending, we need to detach the native message
-        node_message->message = NULL;
-
-        // And release JS message to pool
-        pomelo_node_message_delete(env, context, js_message);
-    }
-
-    // return: boolean
-    napi_value result = NULL;
-    napi_call(napi_get_boolean(env, ret == 0, &result));
-    return result;
+    return result; // Promise<number>
 }
 
 
@@ -524,14 +503,15 @@ napi_value pomelo_node_session_get_channels(
         env, thiz, context->class_session, (void **) &node_session
     ));
 
+    // Get the native session
     pomelo_session_t * session = node_session->session;
     if (!session) {
         napi_throw_msg(POMELO_NODE_ERROR_NATIVE_NULL);
         return NULL;
     }
 
+    // If channels is already created, return it
     if (node_session->channels) {
-        // Got data
         napi_value channels = NULL;
         napi_call(napi_get_reference_value(
             env, node_session->channels, &channels
@@ -540,26 +520,34 @@ napi_value pomelo_node_session_get_channels(
     }
 
     // Create array of channels
-    size_t nchannels = node_session->node_socket->nchannels;
+    pomelo_socket_t * socket = pomelo_session_get_socket(session);
+    size_t nchannels = pomelo_socket_get_nchannels(socket);
     napi_value channels = NULL;
     napi_call(napi_create_array_with_length(env, nchannels, &channels));
     for (size_t i = 0; i < nchannels; i++) {
         pomelo_channel_t * channel = pomelo_session_get_channel(session, i);
-        napi_value js_channel = pomelo_node_channel_new(env, context, channel);
+        napi_value js_channel = pomelo_node_channel_new(env, channel);
         if (!js_channel) {
             // There's an error here
             napi_throw_msg(POMELO_NODE_ERROR_GET_CHANNELS);
             return NULL;
         }
         napi_call(napi_set_element(env, channels, (uint32_t) i, js_channel));
-
-        // Add to managed list
-        pomelo_node_channel_t * node_channel = NULL;
-        napi_call(napi_unwrap(env, js_channel, (void **) &node_channel));
-        pomelo_list_push_back(node_session->list_channels, node_channel);
     }
 
     // Create reference to retain array
     napi_call(napi_create_reference(env, channels, 1, &node_session->channels));
     return channels;
+}
+
+
+/* -------------------------------------------------------------------------- */
+/*                            Implemented APIs                                */
+/* -------------------------------------------------------------------------- */
+
+void pomelo_session_on_cleanup(pomelo_session_t * session) {
+    pomelo_node_session_t * node_session = pomelo_session_get_extra(session);
+    if (!node_session) return; // No associated session
+
+    pomelo_node_context_release_session(node_session->context, node_session);
 }

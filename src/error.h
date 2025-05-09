@@ -8,6 +8,7 @@
 /* -------------------------------------------------------------------------- */
 
 #define POMELO_NODE_ERROR_INIT_POMELO "Failed to initialize pomelo"
+#define POMELO_NODE_ERROR_INIT_PLATFORM_UV "Failed to initialize platform uv"
 #define POMELO_NODE_EMPTY_MESSAGE_ERROR "<empty error message>"
 #define POMELO_NODE_ERROR_NOT_ENOUGH_ARGS "Not enough arguments"
 #define POMELO_NODE_ERROR_CREATE_SOCKET "Failed to create socket"
@@ -26,8 +27,10 @@
 #define POMELO_NODE_ERROR_PARSE_ADDRESS "Failed to parse address"
 #define POMELO_NODE_ERROR_WRITE_MESSAGE "Failed to write data to message"
 #define POMELO_NODE_ERROR_READ_MESSAGE "Failed to read data from message"
-#define POMELO_NODE_ERROR_SOCKET_LISTEN "Failed to start listening"
-#define POMELO_NODE_ERROR_SOCKET_STOP "Failed to stop socket"
+#define POMELO_NODE_ERROR_SOCKET_LISTEN "Failed to listen"
+#define POMELO_NODE_ERROR_SOCKET_CONNECT "Failed to connect"
+#define POMELO_NODE_ERROR_SOCKET_STOP "Failed to stop"
+#define POMELO_NODE_ERROR_SOCKET_SEND "Failed to send"
 
 #define POMELO_NODE_ERROR_ENCODE_TOKEN "Failed to encode connect token"
 #define POMELO_NODE_ERROR_RESET_MESSAGE "Failed to reset message"
@@ -39,6 +42,7 @@
 #define POMELO_NODE_ERROR_GET_CHANNELS "Failed to get channels"
 
 #define POMELO_NODE_ERROR_MESSAGE_RELEASED "This message was released"
+#define POMELO_NODE_ERROR_CREATE_PLATFORM "Failed to create platform"
 
 #define POMELO_NODE_ERROR_MSG_CAPACITY 128
 

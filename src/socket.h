@@ -2,7 +2,6 @@
 #define POMELO_NODE_SOCKET_SRC_H
 #include "module.h"
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,11 +31,8 @@ struct pomelo_node_socket_s {
     /// @brief The received callback
     napi_ref on_received;
 
-    /// @brief Stopped promise deferred callback
-    napi_deferred on_stopped;
-
     /// @brief Connect result promise deferred callback
-    napi_deferred on_connect_result;
+    napi_deferred on_connect_result_deferred;
 
     /// @brief Number of channels
     size_t nchannels;
@@ -48,11 +44,18 @@ struct pomelo_node_socket_s {
 /*----------------------------------------------------------------------------*/
 
 /// @brief Initialize the socket module
-napi_status pomelo_node_init_socket_module(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value ns
+napi_status pomelo_node_init_socket_module(napi_env env, napi_value ns);
+
+
+/// @brief Initialize the socket
+int pomelo_node_socket_init(
+    pomelo_node_socket_t * node_socket,
+    pomelo_node_context_t * context
 );
+
+
+/// @brief Cleanup the socket
+void pomelo_node_socket_cleanup(pomelo_node_socket_t * node_socket);
 
 
 /*----------------------------------------------------------------------------*/
@@ -65,8 +68,8 @@ napi_value pomelo_node_socket_constructor(
     napi_callback_info info
 );
 
-/// @brief Finalize function of socket
-void pomelo_node_socket_finalize(
+/// @brief Finalizer of socket
+void pomelo_node_socket_finalizer(
     napi_env env,
     pomelo_node_socket_t * node_socket,
     pomelo_node_context_t * context
@@ -87,23 +90,13 @@ napi_value pomelo_node_socket_connect(napi_env env, napi_callback_info info);
 /// @brief Socket.stop()
 napi_value pomelo_node_socket_stop(napi_env env, napi_callback_info info);
 
-/// @brief Socket.statistic()
-napi_value pomelo_node_socket_statistic(napi_env env, napi_callback_info info);
-
 /// @brief Socket.send()
 napi_value pomelo_node_socket_send(napi_env env, napi_callback_info info);
 
 /// @brief Socket.time()
 napi_value pomelo_node_socket_time(napi_env env, napi_callback_info info);
 
-void pomelo_node_socket_cancel_connect_result_deferred(
-    pomelo_node_socket_t * node_socket
-);
-
-void pomelo_node_socket_cancel_stopped_deferred(
-    pomelo_node_socket_t * node_socket
-);
-
+/// @brief Call the listener
 void pomelo_node_socket_call_listener(
     pomelo_node_socket_t * node_socket,
     napi_ref callback,

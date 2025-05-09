@@ -1,6 +1,6 @@
 #include <assert.h>
+#include <stdio.h>
 #include "module.h"
-#include "uv.h"
 #include "error.h"
 #include "utils.h"
 #include "context.h"
@@ -40,10 +40,10 @@ napi_value pomelo_node_init(napi_env env, napi_callback_info info) {
     }
 
     // Create context
-    pomelo_node_context_options_t options;
-    pomelo_node_context_options_init(&options);
-    options.allocator = pomelo_allocator_default();
-    options.env = env;
+    pomelo_node_context_options_t options = {
+        .allocator = pomelo_allocator_default(),
+        .env = env,
+    };
     pomelo_node_parse_init_options(env, &options, js_options);
 
     pomelo_node_context_t * context = pomelo_node_context_create(&options);
@@ -62,8 +62,9 @@ napi_value pomelo_node_init(napi_env env, napi_callback_info info) {
     napi_call(napi_create_object(env, &ns));
 
     // Initialize all enums & modules
-    napi_call(pomelo_node_init_all_enums(env, context, ns));
-    napi_call(pomelo_node_init_all_modules(env, context, ns));
+    napi_call(pomelo_node_init_enums(env, ns));
+    napi_call(pomelo_node_init_modules(env, ns));
+    napi_call(pomelo_node_init_functions(env, ns));
 
     return ns;
 }
@@ -106,6 +107,13 @@ static void pomelo_node_parse_init_options(
     }
 
     ret = pomelo_node_get_uint64_property(
+        env, js_options, "poolSocketMax", &value
+    );
+    if (ret == 0) {
+        options->pool_socket_max = (size_t) value;
+    }
+
+    ret = pomelo_node_get_uint64_property(
         env, js_options, "poolSessionMax", &value
     );
     if (ret == 0) {
@@ -127,14 +135,19 @@ static void pomelo_node_parse_init_options(
     napi_callv(napi_get_named_property(
         env, js_options, "errorHandler", &options->error_handler
     ));
+
+    bool has_platform = false;
+    napi_callv(napi_has_named_property(
+        env, js_options, "platform", &has_platform
+    ));
+    if (!has_platform) return;
+    napi_callv(napi_get_named_property(
+        env, js_options, "platform", &options->platform
+    ));
 }
 
 
-napi_status pomelo_node_init_all_enums(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value ns
-) {
+napi_status pomelo_node_init_enums(napi_env env, napi_value ns) {
     napi_value enum_value = NULL;
     napi_value value = NULL;
 
@@ -162,18 +175,39 @@ napi_status pomelo_node_init_all_enums(
 }
 
 
-napi_status pomelo_node_init_all_modules(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value ns
-) {
+napi_status pomelo_node_init_modules(napi_env env, napi_value ns) {
     // Initialize socket modules
-    napi_calls(pomelo_node_init_socket_module(env, context, ns));
-    napi_calls(pomelo_node_init_session_module(env, context, ns));
-    napi_calls(pomelo_node_init_message_module(env, context, ns));
-    napi_calls(pomelo_node_init_token_module(env, context, ns));
-    napi_calls(pomelo_node_init_channel_module(env, context, ns));
-    napi_calls(pomelo_node_init_plugin_module(env, context, ns));
+    napi_calls(pomelo_node_init_socket_module(env, ns));
+    napi_calls(pomelo_node_init_session_module(env, ns));
+    napi_calls(pomelo_node_init_message_module(env, ns));
+    napi_calls(pomelo_node_init_token_module(env, ns));
+    napi_calls(pomelo_node_init_channel_module(env, ns));
+    napi_calls(pomelo_node_init_plugin_module(env, ns));
+
+    return napi_ok;
+}
+
+
+napi_status pomelo_node_init_functions(napi_env env, napi_value ns) {
+    pomelo_node_context_t * context = NULL;
+    napi_calls(napi_get_instance_data(env, (void **) &context));
+    assert(context != NULL);
+
+    napi_value statistic = NULL;
+    napi_calls(napi_create_function(
+        env,
+        "statistic",
+        NAPI_AUTO_LENGTH,
+        pomelo_node_context_statistic,
+        context,
+        &statistic
+    ));
+    napi_calls(napi_set_named_property(
+        env,
+        ns,
+        "statistic",
+        statistic
+    ));
 
     return napi_ok;
 }

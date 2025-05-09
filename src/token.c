@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
+#include "pomelo/random.h"
 #include "module.h"
 #include "token.h"
 #include "error.h"
@@ -12,11 +13,11 @@
 /*                                Public APIs                                 */
 /*----------------------------------------------------------------------------*/
 
-napi_status pomelo_node_init_token_module(
-    napi_env env,
-    pomelo_node_context_t * context,
-    napi_value ns
-) {
+napi_status pomelo_node_init_token_module(napi_env env, napi_value ns) {
+    pomelo_node_context_t * context = NULL;
+    napi_calls(napi_get_instance_data(env, (void **) &context));
+    assert(context != NULL);
+
     // Create wrapper object
     napi_value token = NULL;
     napi_status status = napi_create_object(env, &token);
@@ -333,12 +334,7 @@ napi_value pomelo_node_token_random_buffer(
     void * buffer = NULL;
     napi_value arraybuffer = NULL;
     napi_call(napi_create_arraybuffer(env, length, &buffer, &arraybuffer));
-
-    int ret = pomelo_codec_buffer_random(buffer, length);
-    if (ret < 0) {
-        napi_throw_msg("Failed to random buffer");
-        return NULL;
-    }
+    pomelo_random_buffer(buffer, length);
 
     // Convert to Uint8Array
     napi_value result = NULL;
