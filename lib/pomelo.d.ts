@@ -201,7 +201,7 @@ export interface Session {
     /**
      * The session ID
      */
-    readonly id: number;
+    readonly id: bigint;
 
     /**
      * The channels of session
@@ -541,7 +541,7 @@ export class Socket {
      */
     listen(
         privateKey: Uint8Array,
-        protocolID: number,
+        protocolID: number | bigint,
         maxClients: number,
         address: string
     ): Promise<void>;
@@ -601,15 +601,15 @@ export namespace Token {
      */
     function encode(
         privateKey: Uint8Array,
-        protocolID: number,
-        createTimestamp: number,
-        expireTimestamp: number,
+        protocolID: number | bigint,
+        createTimestamp: number | bigint,
+        expireTimestamp: number | bigint,
         connectTokenNonce: Uint8Array,
         timeout: number,
         addresses: string[],
         clientToServerKey: Uint8Array,
         serverToClientKey: Uint8Array,
-        clientID: number,
+        clientID: number | bigint,
         userData: Uint8Array
     ): Uint8Array;
 

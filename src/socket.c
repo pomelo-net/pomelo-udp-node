@@ -354,8 +354,12 @@ napi_value pomelo_node_socket_listen(napi_env env, napi_callback_info info) {
     }
 
     // Parse protocol ID
-    int32_t protocol_id = 0;
-    napi_call(napi_get_value_int32(env, argv[1], &protocol_id));
+    uint64_t protocol_id = 0;
+    int ret = pomelo_node_parse_uint64_value(env, argv[1], &protocol_id);
+    if (ret < 0) {
+        napi_throw_arg("protocolID");
+        return NULL;
+    }
 
     // Parse max clients
     int32_t max_clients = 0;
@@ -393,7 +397,7 @@ napi_value pomelo_node_socket_listen(napi_env env, napi_callback_info info) {
     napi_call(napi_create_promise(env, &result_deferred, &result));
 
     // Start listening
-    int ret = pomelo_socket_listen(
+    ret = pomelo_socket_listen(
         node_socket->socket,
         private_key,
         protocol_id,
