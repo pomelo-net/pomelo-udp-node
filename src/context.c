@@ -140,6 +140,17 @@ pomelo_node_context_t * pomelo_node_context_create(
         }
     }
 
+    // Create temporary session array
+    pomelo_array_options_t array_options = {
+        .allocator = allocator,
+        .element_size = sizeof(pomelo_session_t *)
+    };
+    context->tmp_send_sessions = pomelo_array_create(&array_options);
+    if (!context->tmp_send_sessions) {
+        pomelo_node_context_destroy(context);
+        return NULL; // Failed to create temporary session array
+    }
+
     return context;
 }
 
@@ -186,6 +197,11 @@ void pomelo_node_context_destroy(pomelo_node_context_t * context) {
         context->error_handler = NULL;
     }
 
+    if (context->tmp_send_sessions) {
+        pomelo_array_destroy(context->tmp_send_sessions);
+        context->tmp_send_sessions = NULL;
+    }
+
     pomelo_allocator_free(context->allocator, context);
 }
 
@@ -198,9 +214,6 @@ void pomelo_node_context_finalizer(
     assert(context != NULL);
     (void) finalize_hint;
 
-    // pomelo_statistic_t statistic;
-    // pomelo_context_statistic(context->context, &statistic);
-    
     pomelo_node_context_destroy(context);
 }
 
