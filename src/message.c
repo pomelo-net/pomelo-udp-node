@@ -299,24 +299,17 @@ napi_value pomelo_node_message_read(napi_env env, napi_callback_info info) {
         return NULL;
     }
 
-    if (size == 0) {
-        // Create empty typed array and return it
-        napi_value result;
-        napi_call(napi_create_typedarray(
-            env, napi_uint8_array, 0, NULL, 0, &result
-        ));
-        return result;
-    }
-
     // Prepare array buffer
     uint8_t * buffer = NULL;
     napi_value arrbuf = NULL;
     napi_call(napi_create_arraybuffer(env, size, (void **) &buffer, &arrbuf));
 
     // Read data from message
-    if (pomelo_message_read_buffer(message, buffer, size) < 0) {
-        napi_throw_msg(POMELO_NODE_ERROR_READ_MESSAGE);
-        return NULL;
+    if (size > 0) {
+        if (pomelo_message_read_buffer(message, buffer, size) < 0) {
+            napi_throw_msg(POMELO_NODE_ERROR_READ_MESSAGE);
+            return NULL;
+        }
     }
     
     // Create typed array
