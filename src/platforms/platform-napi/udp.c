@@ -275,20 +275,20 @@ static napi_ref platform_udp_bind(
 
 
 pomelo_platform_udp_t * pomelo_platform_napi_udp_bind(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_address_t * address
 ) {
-    assert(i != NULL);
+    assert(platform != NULL);
     assert(address != NULL);
 
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
-    napi_env env = platform->env;
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
+    napi_env env = impl->env;
 
     napi_handle_scope scope = NULL;
     napi_status status = napi_open_handle_scope(env, &scope);
     if (status != napi_ok) return NULL;
 
-    napi_ref result = platform_udp_bind(platform, address);
+    napi_ref result = platform_udp_bind(impl, address);
 
     status = napi_close_handle_scope(env, scope);
     if (status != napi_ok) return NULL;
@@ -346,20 +346,20 @@ static napi_ref platform_udp_connect(
 
 
 pomelo_platform_udp_t * pomelo_platform_napi_udp_connect(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_address_t * address
 ) {
-    assert(i != NULL);
+    assert(platform != NULL);
     assert(address != NULL);
 
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
-    napi_env env = platform->env;
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
+    napi_env env = impl->env;
 
     napi_handle_scope scope = NULL;
     napi_status status = napi_open_handle_scope(env, &scope);
     if (status != napi_ok) return NULL;
 
-    napi_ref result = platform_udp_connect(platform, address);
+    napi_ref result = platform_udp_connect(impl, address);
 
     status = napi_close_handle_scope(env, scope);
     if (status != napi_ok) return NULL;
@@ -422,20 +422,20 @@ static int platform_udp_stop(
 
 
 int pomelo_platform_napi_udp_stop(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_udp_t * socket
 ) {
-    assert(i != NULL);
+    assert(platform != NULL);
     assert(socket != NULL);
 
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
-    napi_env env = platform->env;
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
+    napi_env env = impl->env;
 
     napi_handle_scope scope = NULL;
     napi_status status = napi_open_handle_scope(env, &scope);
     if (status != napi_ok) return -1;
 
-    int result = platform_udp_stop(platform, socket);
+    int result = platform_udp_stop(impl, socket);
 
     status = napi_close_handle_scope(env, scope);
     if (status != napi_ok) return -1;
@@ -614,7 +614,7 @@ static int platform_udp_send(
 
 
 int pomelo_platform_napi_udp_send(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_udp_t * socket,
     pomelo_address_t * address,
     int niovec,
@@ -622,16 +622,16 @@ int pomelo_platform_napi_udp_send(
     void * callback_data,
     pomelo_platform_send_cb send_callback
 ) {
-    assert(i != NULL);
+    assert(platform != NULL);
 
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
-    napi_env env = platform->env;
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
+    napi_env env = impl->env;
     napi_handle_scope scope = NULL;
     napi_status status = napi_open_handle_scope(env, &scope);
     if (status != napi_ok) return -1;
 
     int result = platform_udp_send(
-        platform,
+        impl,
         socket,
         address,
         niovec,
@@ -685,22 +685,22 @@ static void platform_udp_recv_start(
 
 /// @brief Set the socket callback for platform
 void pomelo_platform_napi_udp_recv_start(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_udp_t * socket,
     void * context,
     pomelo_platform_alloc_cb alloc_callback,
     pomelo_platform_recv_cb recv_callback
 ) {
-    assert(i != NULL);
+    assert(platform != NULL);
 
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
-    napi_env env = platform->env;
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
+    napi_env env = impl->env;
     napi_handle_scope scope = NULL;
     napi_status status = napi_open_handle_scope(env, &scope);
     if (status != napi_ok) return;
 
     platform_udp_recv_start(
-        platform,
+        impl,
         socket,
         context,
         alloc_callback,

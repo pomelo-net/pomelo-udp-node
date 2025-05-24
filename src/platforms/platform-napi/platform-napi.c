@@ -48,73 +48,73 @@ static pomelo_platform_napi_t * platform_create(
     platform->allocator = allocator;
 
     if (!parse_platform_options(env, options, "hrtime", &platform->hrtime)) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
     if (!parse_platform_options(env, options, "now", &platform->now)) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
     if (!parse_platform_options(env, options, "udpBind", &platform->udp_bind)) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
     if (!parse_platform_options(
         env, options, "udpCreate", &platform->udp_create
     )) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
     if (!parse_platform_options(
         env, options, "udpConnect", &platform->udp_connect
     )) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
     if (!parse_platform_options(
         env, options, "udpStop", &platform->udp_stop
     )) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
     if (!parse_platform_options(
         env, options, "udpSend", &platform->udp_send
     )) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
     if (!parse_platform_options(
         env, options, "timerCreate", &platform->timer_create
     )) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
     if (!parse_platform_options(
         env, options, "timerStart", &platform->timer_start
     )) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
     if (!parse_platform_options(
         env, options, "timerStop", &platform->timer_stop
     )) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
     if (!parse_platform_options(
         env, options, "statistic", &platform->statistic
     )) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
@@ -128,7 +128,7 @@ static pomelo_platform_napi_t * platform_create(
         pomelo_platform_udp_info_finalize;
     platform->udp_info_pool = pomelo_pool_root_create(&pool_options);
     if (platform->udp_info_pool == NULL) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
@@ -141,7 +141,7 @@ static pomelo_platform_napi_t * platform_create(
         pomelo_platform_timer_info_finalize;
     platform->timer_info_pool = pomelo_pool_root_create(&pool_options);
     if (platform->timer_info_pool == NULL) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
@@ -152,7 +152,7 @@ static pomelo_platform_napi_t * platform_create(
     pool_options.zero_init = true;
     platform->task_worker_pool = pomelo_pool_root_create(&pool_options);
     if (platform->task_worker_pool == NULL) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
@@ -164,7 +164,7 @@ static pomelo_platform_napi_t * platform_create(
     pool_options.synchronized = true;
     platform->task_threadsafe_pool = pomelo_pool_root_create(&pool_options);
     if (platform->task_threadsafe_pool == NULL) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
     
@@ -175,7 +175,7 @@ static pomelo_platform_napi_t * platform_create(
     pool_options.zero_init = true;
     platform->threadsafe_executor_pool = pomelo_pool_root_create(&pool_options);
     if (platform->threadsafe_executor_pool == NULL) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
@@ -190,7 +190,7 @@ static pomelo_platform_napi_t * platform_create(
         &recv_callback
     );
     if (status != napi_ok) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
@@ -199,7 +199,7 @@ static pomelo_platform_napi_t * platform_create(
         env, recv_callback, 1, &platform->udp_recv_callback
     );
     if (status != napi_ok) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
@@ -214,7 +214,7 @@ static pomelo_platform_napi_t * platform_create(
         &send_callback
     );
     if (status != napi_ok) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
@@ -223,7 +223,7 @@ static pomelo_platform_napi_t * platform_create(
         env, send_callback, 1, &platform->udp_send_callback
     );
     if (status != napi_ok) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
@@ -238,7 +238,7 @@ static pomelo_platform_napi_t * platform_create(
         &timer_callback
     );
     if (status != napi_ok) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
@@ -247,14 +247,15 @@ static pomelo_platform_napi_t * platform_create(
         env, timer_callback, 1, &platform->timer_callback
     );
     if (status != napi_ok) {
-        pomelo_platform_napi_destroy(&platform->i);
+        pomelo_platform_napi_destroy(&platform->base);
         return NULL;
     }
 
     return platform;
 }
 
-pomelo_platform_interface_t * pomelo_platform_napi_create(
+
+pomelo_platform_t * pomelo_platform_napi_create(
     pomelo_allocator_t * allocator,
     napi_env env,
     napi_value options
@@ -271,40 +272,39 @@ pomelo_platform_interface_t * pomelo_platform_napi_create(
     status = napi_close_handle_scope(env, scope);
     if (status != napi_ok) {
         if (platform != NULL) {
-            pomelo_platform_napi_destroy(&platform->i);
+            pomelo_platform_napi_destroy(&platform->base);
         }
         return NULL;
     }
 
     if (platform == NULL) return NULL;
 
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    // Setup the interface
-    i->allocator = allocator;
-    i->internal = platform;
-    i->destroy = pomelo_platform_napi_destroy;
-    i->startup = pomelo_platform_napi_startup;
-    i->shutdown = pomelo_platform_napi_shutdown;
-    i->hrtime = pomelo_platform_napi_hrtime;
-    i->now = pomelo_platform_napi_now;
-    i->acquire_threadsafe_executor =
-        pomelo_platform_napi_acquire_threadsafe_executor;
-    i->release_threadsafe_executor =
-        pomelo_platform_napi_release_threadsafe_executor;
-    i->threadsafe_executor_submit =
-        pomelo_platform_napi_threadsafe_executor_submit;
-    i->submit_worker_task = pomelo_platform_napi_submit_worker_task;
-    i->cancel_worker_task = pomelo_platform_napi_cancel_worker_task;
-    i->udp_bind = pomelo_platform_napi_udp_bind;
-    i->udp_connect = pomelo_platform_napi_udp_connect;
-    i->udp_stop = pomelo_platform_napi_udp_stop;
-    i->udp_send = pomelo_platform_napi_udp_send;
-    i->udp_recv_start = pomelo_platform_napi_udp_recv_start;
-    i->timer_start = pomelo_platform_napi_timer_start;
-    i->timer_stop = pomelo_platform_napi_timer_stop;
-    i->statistic = pomelo_platform_napi_statistic;
+    pomelo_platform_t * base = &platform->base;
 
-    return i;
+    // Setup the interface
+    base->destroy = pomelo_platform_napi_destroy;
+    base->startup = pomelo_platform_napi_startup;
+    base->shutdown = pomelo_platform_napi_shutdown;
+    base->hrtime = pomelo_platform_napi_hrtime;
+    base->now = pomelo_platform_napi_now;
+    base->acquire_threadsafe_executor =
+        pomelo_platform_napi_acquire_threadsafe_executor;
+    base->release_threadsafe_executor =
+        pomelo_platform_napi_release_threadsafe_executor;
+    base->threadsafe_executor_submit =
+        pomelo_platform_napi_threadsafe_executor_submit;
+    base->submit_worker_task = pomelo_platform_napi_submit_worker_task;
+    base->cancel_worker_task = pomelo_platform_napi_cancel_worker_task;
+    base->udp_bind = pomelo_platform_napi_udp_bind;
+    base->udp_connect = pomelo_platform_napi_udp_connect;
+    base->udp_stop = pomelo_platform_napi_udp_stop;
+    base->udp_send = pomelo_platform_napi_udp_send;
+    base->udp_recv_start = pomelo_platform_napi_udp_recv_start;
+    base->timer_start = pomelo_platform_napi_timer_start;
+    base->timer_stop = pomelo_platform_napi_timer_stop;
+    base->statistic = pomelo_platform_napi_statistic;
+
+    return base;
 }
 
 
@@ -404,10 +404,10 @@ static void platform_destroy(pomelo_platform_napi_t * platform) {
 }
 
 
-void pomelo_platform_napi_destroy(pomelo_platform_interface_t * i) {
-    assert(i != NULL);
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
-    napi_env env = platform->env;
+void pomelo_platform_napi_destroy(pomelo_platform_t * platform) {
+    assert(platform != NULL);
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
+    napi_env env = impl->env;
 
     // Open the handle scope
     napi_handle_scope scope = NULL;
@@ -415,36 +415,36 @@ void pomelo_platform_napi_destroy(pomelo_platform_interface_t * i) {
     if (status != napi_ok) return;
 
     // Destroy the platform
-    platform_destroy(platform);
+    platform_destroy(impl);
 
     // Close the handle scope
     napi_close_handle_scope(env, scope);
 }
 
 
-void pomelo_platform_napi_startup(pomelo_platform_interface_t * i) {
-    (void) i;
+void pomelo_platform_napi_startup(pomelo_platform_t * platform) {
+    (void) platform;
 }
 
 
 void pomelo_platform_napi_shutdown(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_shutdown_callback callback
 ) {
     if (callback != NULL) {
-        callback((pomelo_platform_t *) i);
+        callback(platform);
     }
 }
 
 
 napi_value pomelo_platform_napi_statistic(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     napi_env env
 ) {
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
     napi_value fn_statistic = NULL;
     napi_call(napi_get_reference_value(
-        platform->env, platform->statistic, &fn_statistic
+        impl->env, impl->statistic, &fn_statistic
     ));
 
     napi_value result = NULL;
@@ -472,18 +472,19 @@ napi_value pomelo_node_platform_napi_init(
     if (argc != INIT_PLATFORM_NAPI_ARGC) return NULL;
 
     pomelo_allocator_t * allocator = pomelo_allocator_default();
-    pomelo_platform_interface_t * i =
+    pomelo_platform_t * platform =
         pomelo_platform_napi_create(allocator, env, argv[0]);
-    if (!i) {
+    if (!platform) {
         napi_throw_msg(POMELO_NODE_ERROR_CREATE_PLATFORM);
         return NULL;
     }
 
     napi_value result = NULL;
-    napi_status status = napi_create_external(env, i, NULL, NULL, &result);
+    napi_status status =
+        napi_create_external(env, platform, NULL, NULL, &result);
     if (status != napi_ok) {
         napi_throw_msg(POMELO_NODE_ERROR_CREATE_PLATFORM);
-        pomelo_platform_napi_destroy(i);
+        pomelo_platform_napi_destroy(platform);
         return NULL;
     }
 

@@ -324,7 +324,8 @@
       "deps/pomelo-udp-native/src/utils/mutex.h",
       "deps/pomelo-udp-native/src/utils/pool.c",
       "deps/pomelo-udp-native/src/utils/pool.h",
-      "src/platforms/platform-uv.c",
+      "src/platforms/platform-uv/platform-uv.c",
+      "src/platforms/platform-uv/platform-uv.h",
       "src/platform.h",
     ],
     'include_dirs': [

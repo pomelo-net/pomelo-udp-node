@@ -19,7 +19,7 @@ typedef struct pomelo_platform_napi_s pomelo_platform_napi_t;
 
 struct pomelo_platform_napi_s {
     /// @brief The platform interface
-    pomelo_platform_interface_t i;
+    pomelo_platform_t base;
 
     /// @brief The allocator
     pomelo_allocator_t * allocator;
@@ -87,7 +87,7 @@ struct pomelo_platform_napi_s {
 
 
 /// @brief Create the platform NAPI
-pomelo_platform_interface_t * pomelo_platform_napi_create(
+pomelo_platform_t * pomelo_platform_napi_create(
     pomelo_allocator_t * allocator,
     napi_env env,
     napi_value exports
@@ -95,23 +95,23 @@ pomelo_platform_interface_t * pomelo_platform_napi_create(
 
 
 /// @brief Destroy the platform NAPI
-void pomelo_platform_napi_destroy(pomelo_platform_interface_t * i);
+void pomelo_platform_napi_destroy(pomelo_platform_t * i);
 
 
 /// @brief Startup the platform NAPI
-void pomelo_platform_napi_startup(pomelo_platform_interface_t * i);
+void pomelo_platform_napi_startup(pomelo_platform_t * i);
 
 
 /// @brief Shutdown the platform NAPI
 void pomelo_platform_napi_shutdown(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * i,
     pomelo_platform_shutdown_callback callback
 );
 
 
 /// @brief Get the statistic
 napi_value pomelo_platform_napi_statistic(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * i,
     napi_env env
 );
 

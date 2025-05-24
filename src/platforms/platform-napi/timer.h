@@ -47,7 +47,7 @@ void pomelo_platform_timer_info_finalize(pomelo_platform_timer_info_t * info);
 
 /// @brief Start the timer
 int pomelo_platform_napi_timer_start(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_timer_entry entry,
     uint64_t timeout_ms,
     uint64_t repeat_ms,
@@ -58,7 +58,7 @@ int pomelo_platform_napi_timer_start(
 
 /// @brief Stop the timer
 void pomelo_platform_napi_timer_stop(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_timer_handle_t * handle
 );
 

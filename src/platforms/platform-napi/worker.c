@@ -33,34 +33,34 @@ static void async_work_complete(
 
 
 pomelo_platform_task_t * pomelo_platform_napi_submit_worker_task(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_task_entry entry,
     pomelo_platform_task_complete complete,
     void * data
 ) {
-    assert(i != NULL);
+    assert(platform != NULL);
     assert(entry != NULL);
     assert(complete != NULL);
 
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
-    assert(platform != NULL);
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
+    assert(impl != NULL);
 
     pomelo_platform_task_worker_t * task_worker =
-        pomelo_pool_acquire(platform->task_worker_pool, NULL);
+        pomelo_pool_acquire(impl->task_worker_pool, NULL);
     if (task_worker == NULL) return NULL;
-    task_worker->platform = platform;
+    task_worker->platform = impl;
     task_worker->entry = entry;
     task_worker->complete = complete;
     task_worker->data = data;
 
-    napi_env env = platform->env;
+    napi_env env = impl->env;
     // Create async work
     napi_async_work async_work = NULL;
 
     napi_value null_value;
     napi_status status = napi_get_null(env, &null_value);
     if (status != napi_ok) {
-        pomelo_pool_release(platform->task_worker_pool, task_worker);
+        pomelo_pool_release(impl->task_worker_pool, task_worker);
         return NULL;
     }
 
@@ -74,7 +74,7 @@ pomelo_platform_task_t * pomelo_platform_napi_submit_worker_task(
         &async_work
     );
     if (status != napi_ok) {
-        pomelo_pool_release(platform->task_worker_pool, task_worker);
+        pomelo_pool_release(impl->task_worker_pool, task_worker);
         return NULL;
     }
 
@@ -83,7 +83,7 @@ pomelo_platform_task_t * pomelo_platform_napi_submit_worker_task(
     // Queue the async work
     status = napi_queue_async_work(env, async_work);
     if (status != napi_ok) {
-        pomelo_pool_release(platform->task_worker_pool, task_worker);
+        pomelo_pool_release(impl->task_worker_pool, task_worker);
         return NULL; // Failed to queue the async work
     }
 
@@ -92,18 +92,18 @@ pomelo_platform_task_t * pomelo_platform_napi_submit_worker_task(
 
 
 void pomelo_platform_napi_cancel_worker_task(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_task_t * task
 ) {
-    assert(i != NULL);
+    assert(platform != NULL);
     assert(task != NULL);
 
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
-    assert(platform != NULL);
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
+    assert(impl != NULL);
     
     pomelo_platform_task_worker_t * task_worker =
         (pomelo_platform_task_worker_t *) task;
 
     task_worker->canceled = true;
-    napi_cancel_async_work(platform->env, task_worker->async_work);
+    napi_cancel_async_work(impl->env, task_worker->async_work);
 }

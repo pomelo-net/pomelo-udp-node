@@ -35,20 +35,20 @@ struct pomelo_threadsafe_executor_s {
 
 /// @brief Acquire the threadsafe executor
 pomelo_threadsafe_executor_t * pomelo_platform_napi_acquire_threadsafe_executor(
-    pomelo_platform_interface_t * i
+    pomelo_platform_t * platform
 );
 
 
 /// @brief Release the threadsafe executor
 void pomelo_platform_napi_release_threadsafe_executor(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_threadsafe_executor_t * executor
 );
 
 
 /// @brief Submit a task to the threadsafe executor
 pomelo_platform_task_t * pomelo_platform_napi_threadsafe_executor_submit(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_threadsafe_executor_t * executor,
     pomelo_platform_task_entry entry,
     void * data

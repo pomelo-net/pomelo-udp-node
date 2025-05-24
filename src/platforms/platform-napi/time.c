@@ -29,16 +29,16 @@ static uint64_t platform_hrtime(pomelo_platform_napi_t * platform) {
 }
 
 
-uint64_t pomelo_platform_napi_hrtime(pomelo_platform_interface_t * i) {
-    assert(i != NULL);
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
-    napi_env env = platform->env;
+uint64_t pomelo_platform_napi_hrtime(pomelo_platform_t * platform) {
+    assert(platform != NULL);
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
+    napi_env env = impl->env;
 
     napi_handle_scope scope = NULL;
     napi_status status = napi_open_handle_scope(env, &scope);
     if (status != napi_ok) return 0;
 
-    uint64_t hrtime = platform_hrtime(platform);
+    uint64_t hrtime = platform_hrtime(impl);
 
     status = napi_close_handle_scope(env, scope);
     if (status != napi_ok) return 0;
@@ -74,20 +74,19 @@ static uint64_t platform_now(pomelo_platform_napi_t * platform) {
 }
 
 
-uint64_t pomelo_platform_napi_now(pomelo_platform_interface_t * i) {
-    assert(i != NULL);
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
-    napi_env env = platform->env;
+uint64_t pomelo_platform_napi_now(pomelo_platform_t * platform) {
+    assert(platform != NULL);
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
+    napi_env env = impl->env;
 
     napi_handle_scope scope = NULL;
     napi_status status = napi_open_handle_scope(env, &scope);
     if (status != napi_ok) return 0;
 
-    uint64_t result = platform_now(platform);
+    uint64_t result = platform_now(impl);
 
     status = napi_close_handle_scope(env, scope);
     if (status != napi_ok) return 0;
 
     return result;
 }
-

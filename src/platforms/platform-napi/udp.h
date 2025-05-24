@@ -49,28 +49,28 @@ void pomelo_platform_udp_info_finalize(pomelo_platform_udp_info_t * info);
 
 /// @brief Bind the UDP socket
 pomelo_platform_udp_t * pomelo_platform_napi_udp_bind(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_address_t * address
 );
 
 
 /// @brief Connect the UDP socket
 pomelo_platform_udp_t * pomelo_platform_napi_udp_connect(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_address_t * address
 );
 
 
 /// @brief Stop the UDP socket
 int pomelo_platform_napi_udp_stop(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_udp_t * socket
 );
 
 
 /// @brief Send a packet to the UDP socket
 int pomelo_platform_napi_udp_send(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_udp_t * socket,
     pomelo_address_t * address,
     int niovec,
@@ -82,7 +82,7 @@ int pomelo_platform_napi_udp_send(
 
 /// @brief Start receiving packets from the UDP socket
 void pomelo_platform_napi_udp_recv_start(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_udp_t * socket,
     void * context,
     pomelo_platform_alloc_cb alloc_callback,

@@ -155,9 +155,9 @@ pomelo_node_context_t * pomelo_node_context_create(
 }
 
 
-static void context_on_shutdown(pomelo_platform_interface_t * i) {
-    assert(i != NULL);
-    i->destroy(i);
+static void context_on_shutdown(pomelo_platform_t * platform) {
+    assert(platform != NULL);
+    platform->destroy(platform);
 }
 
 
@@ -417,9 +417,8 @@ napi_value pomelo_node_context_statistic(
     napi_call(napi_set_named_property(env, category, "buffers", entity));
 
     // Platform statistic
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *)
-        context->platform;
-    category = i->statistic(i, env);
+    pomelo_platform_t * platform = context->platform;
+    category = platform->statistic(platform, env);
     if (!category) {
         napi_call(napi_create_object(env, &category));
     }

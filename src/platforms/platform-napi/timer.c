@@ -181,24 +181,24 @@ static int timer_start(
 
 
 int pomelo_platform_napi_timer_start(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_timer_entry entry,
     uint64_t timeout_ms,
     uint64_t repeat_ms,
     void * data,
     pomelo_platform_timer_handle_t * handle
 ) {
-    assert(i != NULL);
+    assert(platform != NULL);
 
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
-    napi_env env = platform->env;
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
+    napi_env env = impl->env;
 
     napi_handle_scope scope = NULL;
     napi_status status = napi_open_handle_scope(env, &scope);
     if (status != napi_ok) return -1;
 
     // Start the timer
-    int ret = timer_start(platform, entry, timeout_ms, repeat_ms, data, handle);
+    int ret = timer_start(impl, entry, timeout_ms, repeat_ms, data, handle);
     
     status = napi_close_handle_scope(env, scope);
     if (status != napi_ok) return -1;
@@ -254,7 +254,7 @@ static void timer_stop(
 
 
 void pomelo_platform_napi_timer_stop(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * i,
     pomelo_platform_timer_handle_t * handle
 ) {
     assert(i != NULL);

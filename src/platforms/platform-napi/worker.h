@@ -34,7 +34,7 @@ struct pomelo_platform_task_worker_s {
 
 /// @brief Submit a task to the worker thread
 pomelo_platform_task_t * pomelo_platform_napi_submit_worker_task(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_task_entry entry,
     pomelo_platform_task_complete complete,
     void * data
@@ -43,7 +43,7 @@ pomelo_platform_task_t * pomelo_platform_napi_submit_worker_task(
 
 /// @brief Cancel a worker task
 void pomelo_platform_napi_cancel_worker_task(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_platform_task_t * task
 );
 

@@ -2,23 +2,15 @@
 #include "platform.h"
 
 
-/**
- * In the context of this file, the platform pointer is actually a pointer to
- * the platform interface.
- */
-
-
 void pomelo_platform_set_extra(pomelo_platform_t * platform, void * data) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    i->extra = data;
+    platform->set_extra(platform, data);
 }
 
 
 void * pomelo_platform_get_extra(pomelo_platform_t * platform) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    return i->extra;
+    return platform->get_extra(platform);
 }
 
 
@@ -28,8 +20,7 @@ void * pomelo_platform_get_extra(pomelo_platform_t * platform) {
 
 void pomelo_platform_startup(pomelo_platform_t * platform) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    i->startup(i);
+    platform->startup(platform);
 }
 
 
@@ -38,8 +29,7 @@ void pomelo_platform_shutdown(
     pomelo_platform_shutdown_callback callback
 ) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    i->shutdown(i, callback);
+    platform->shutdown(platform, callback);
 }
 
 
@@ -50,14 +40,13 @@ void pomelo_platform_shutdown(
 
 uint64_t pomelo_platform_hrtime(pomelo_platform_t * platform) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    return i->hrtime(i);
+    return platform->hrtime(platform);
 }
+
 
 uint64_t pomelo_platform_now(pomelo_platform_t * platform) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    return i->now(i);
+    return platform->now(platform);
 }
 
 
@@ -69,8 +58,7 @@ pomelo_threadsafe_executor_t * pomelo_platform_acquire_threadsafe_executor(
     pomelo_platform_t * platform
 ) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    return i->acquire_threadsafe_executor(i);
+    return platform->acquire_threadsafe_executor(platform);
 }
 
 
@@ -79,8 +67,7 @@ void pomelo_platform_release_threadsafe_executor(
     pomelo_threadsafe_executor_t * executor
 ) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    i->release_threadsafe_executor(i, executor);
+    platform->release_threadsafe_executor(platform, executor);
 }
 
 
@@ -92,8 +79,12 @@ pomelo_platform_task_t * pomelo_threadsafe_executor_submit(
 ) {
     assert(platform != NULL);
     assert(executor != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    return i->threadsafe_executor_submit(i, executor, entry, data);
+    return platform->threadsafe_executor_submit(
+        platform,
+        executor,
+        entry,
+        data
+    );
 }
 
 
@@ -108,8 +99,7 @@ pomelo_platform_task_t * pomelo_platform_submit_worker_task(
     void * data
 ) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    return i->submit_worker_task(i, entry, complete, data);
+    return platform->submit_worker_task(platform, entry, complete, data);
 }
 
 
@@ -118,8 +108,7 @@ void pomelo_platform_cancel_worker_task(
     pomelo_platform_task_t * task
 ) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    i->cancel_worker_task(i, task);
+    platform->cancel_worker_task(platform, task);
 }
 
 
@@ -133,8 +122,7 @@ pomelo_platform_udp_t * pomelo_platform_udp_bind(
     pomelo_address_t * address
 ) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    return i->udp_bind(i, address);
+    return platform->udp_bind(platform, address);
 }
 
 
@@ -143,8 +131,7 @@ pomelo_platform_udp_t * pomelo_platform_udp_connect(
     pomelo_address_t * address
 ) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    return i->udp_connect(i, address);
+    return platform->udp_connect(platform, address);
 }
 
 
@@ -153,8 +140,7 @@ int pomelo_platform_udp_stop(
     pomelo_platform_udp_t * socket
 ) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    return i->udp_stop(i, socket);
+    return platform->udp_stop(platform, socket);
 }
 
 
@@ -168,9 +154,8 @@ int pomelo_platform_udp_send(
     pomelo_platform_send_cb send_callback
 ) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    return i->udp_send(
-        i, socket, address, niovec, iovec, callback_data, send_callback
+    return platform->udp_send(
+        platform, socket, address, niovec, iovec, callback_data, send_callback
     );
 }
 
@@ -183,8 +168,9 @@ void pomelo_platform_udp_recv_start(
     pomelo_platform_recv_cb recv_callback
 ) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    i->udp_recv_start(i, socket, context, alloc_callback, recv_callback);
+    platform->udp_recv_start(
+        platform, socket, context, alloc_callback, recv_callback
+    );
 }
 
 
@@ -202,8 +188,9 @@ int pomelo_platform_timer_start(
     pomelo_platform_timer_handle_t * handle
 ) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    return i->timer_start(i, entry, timeout_ms, repeat_ms, data, handle);
+    return platform->timer_start(
+        platform, entry, timeout_ms, repeat_ms, data, handle
+    );
 }
 
 
@@ -212,6 +199,5 @@ void pomelo_platform_timer_stop(
     pomelo_platform_timer_handle_t * handle
 ) {
     assert(platform != NULL);
-    pomelo_platform_interface_t * i = (pomelo_platform_interface_t *) platform;
-    i->timer_stop(i, handle);
+    platform->timer_stop(platform, handle);
 }

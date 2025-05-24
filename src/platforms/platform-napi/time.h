@@ -8,11 +8,11 @@ extern "C" {
 
 
 /// @brief Get the high resolution time
-uint64_t pomelo_platform_napi_hrtime(pomelo_platform_interface_t * i);
+uint64_t pomelo_platform_napi_hrtime(pomelo_platform_t * platform);
 
 
 /// @brief Get the current time
-uint64_t pomelo_platform_napi_now(pomelo_platform_interface_t * i);
+uint64_t pomelo_platform_napi_now(pomelo_platform_t * platform);
 
 
 #ifdef __cplusplus

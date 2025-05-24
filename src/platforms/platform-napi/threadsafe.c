@@ -24,20 +24,20 @@ static void threadsafe_function_entry(
 
 
 pomelo_threadsafe_executor_t * pomelo_platform_napi_acquire_threadsafe_executor(
-    pomelo_platform_interface_t * i
+    pomelo_platform_t * platform
 ) {
-    assert(i != NULL);
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
+    assert(platform != NULL);
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
 
     // Acquire the threadsafe executor
     pomelo_threadsafe_executor_t * executor =
-        pomelo_pool_acquire(platform->threadsafe_executor_pool, NULL);
+        pomelo_pool_acquire(impl->threadsafe_executor_pool, NULL);
     if (executor == NULL) return NULL;
 
     // Create the threadsafe function
     napi_threadsafe_function threadsafe_function = NULL;
     napi_status status = napi_create_threadsafe_function(
-        platform->env,
+        impl->env,
         NULL,
         NULL,
         NULL,
@@ -45,17 +45,17 @@ pomelo_threadsafe_executor_t * pomelo_platform_napi_acquire_threadsafe_executor(
         1,
         NULL,
         NULL,
-        platform,
+        impl,
         (napi_threadsafe_function_call_js) threadsafe_function_entry,
         &threadsafe_function
     );
     if (status != napi_ok) {
-        pomelo_pool_release(platform->threadsafe_executor_pool, executor);
+        pomelo_pool_release(impl->threadsafe_executor_pool, executor);
         return NULL; // Failed to create the threadsafe function
     }
 
     // Set the threadsafe function
-    executor->platform = platform;
+    executor->platform = impl;
     executor->threadsafe_function = threadsafe_function;
 
     return executor;
@@ -78,12 +78,12 @@ static void release_threadsafe_executor(
 
 
 void pomelo_platform_napi_release_threadsafe_executor(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_threadsafe_executor_t * executor
 ) {
     // Submit the task to the threadsafe executor
     pomelo_platform_napi_threadsafe_executor_submit(
-        i,
+        platform,
         executor,
         (pomelo_platform_task_entry) release_threadsafe_executor,
         executor
@@ -92,21 +92,21 @@ void pomelo_platform_napi_release_threadsafe_executor(
 
 
 pomelo_platform_task_t * pomelo_platform_napi_threadsafe_executor_submit(
-    pomelo_platform_interface_t * i,
+    pomelo_platform_t * platform,
     pomelo_threadsafe_executor_t * executor,
     pomelo_platform_task_entry entry,
     void * data
 ) {
-    assert(i != NULL);
+    assert(platform != NULL);
     assert(executor != NULL);
     assert(entry != NULL);
 
-    pomelo_platform_napi_t * platform = (pomelo_platform_napi_t *) i;
+    pomelo_platform_napi_t * impl = (pomelo_platform_napi_t *) platform;
     pomelo_platform_task_threadsafe_t * task_threadsafe =
-        pomelo_pool_acquire(platform->task_threadsafe_pool, NULL);
+        pomelo_pool_acquire(impl->task_threadsafe_pool, NULL);
     if (task_threadsafe == NULL) return NULL;
 
-    task_threadsafe->platform = platform;
+    task_threadsafe->platform = impl;
     task_threadsafe->entry = entry;
     task_threadsafe->data = data;
 
@@ -116,7 +116,7 @@ pomelo_platform_task_t * pomelo_platform_napi_threadsafe_executor_submit(
         napi_tsfn_nonblocking
     );
     if (status != napi_ok) {
-        pomelo_pool_release(platform->task_threadsafe_pool, task_threadsafe);
+        pomelo_pool_release(impl->task_threadsafe_pool, task_threadsafe);
         return NULL; // Failed to push the task to the threadsafe function
     }
 
